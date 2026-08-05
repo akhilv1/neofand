@@ -9,6 +9,13 @@
     clippy::module_name_repetitions
 )]
 
+//! neofand — compute-focused fan daemon, forked from T2FanRD (GnomedDev).
+//!
+//! Built for machines where the GPUs, not the CPU, are what get hot: the fan
+//! curve is driven by GPU temperature, with the CPU tracked as a floor.
+//!
+//! See README.md for configuration and the profile definitions.
+
 use std::{
     io::{ErrorKind, Read, Seek},
     path::PathBuf,
@@ -17,24 +24,49 @@ use std::{
 };
 
 use arraydeque::ArrayDeque;
-use fan_controller::FanController;
+use fan_controller::{FanController, Readings};
 use nonempty::NonEmpty as NonEmptyVec;
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use config::load_fan_configs;
+use config::{load_config, CoverMode, MAX_FALL_SAMPLES};
 use error::{Error, Result};
 
 mod config;
 mod error;
 mod fan_controller;
+mod gpu;
+mod nvidia;
+mod smc;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("This tool is only developed for Linux systems.");
 
 #[cfg(debug_assertions)]
-const PID_FILE: &str = "t2fand.pid";
+const PID_FILE: &str = "neofand.pid";
 #[cfg(not(debug_assertions))]
-const PID_FILE: &str = "/run/t2fand.pid";
+const PID_FILE: &str = "/run/neofand.pid";
+
+/// Candidate locations for the SMC fan attributes, tried in order.
+///
+/// Upstream globs `/sys/devices/pci*/*/*/*/APP0001:00/`, which never matches on
+/// MacPro7,1 — the node lives under `LNXSYSTM:00/.../device:1f/` and the `pci`
+/// physical-node path carries no fan attributes at all.
+///
+/// Two traps to avoid when fixing that. A `**` glob over `/sys/devices` pins a
+/// core indefinitely, because /sys is full of symlink cycles. And widening the
+/// first component to `*` makes the same node reachable 67 different ways, which
+/// silently breaks the positional zip of Fan1..FanN config sections against
+/// discovered paths. So: anchor on the ACPI bus symlink, which is a single
+/// stable path, and canonicalise + dedupe regardless.
+const FAN_GLOBS: &[&str] = &[
+    "/sys/bus/acpi/devices/APP0001:00/fan*_input",
+    "/sys/class/hwmon/hwmon*/device/fan*_input",
+    "/sys/devices/platform/applesmc.768/fan*_input",
+];
+
+const CPU_TEMP_GLOB: &str = "/sys/devices/platform/coretemp.0/hwmon/hwmon*/temp1_input";
+
+type TempHistory = ArrayDeque<u8, MAX_FALL_SAMPLES, arraydeque::Wrapping>;
 
 fn get_current_euid() -> libc::uid_t {
     // SAFETY: FFI call with no preconditions
@@ -42,28 +74,34 @@ fn get_current_euid() -> libc::uid_t {
 }
 
 fn find_fan_paths() -> Result<NonEmptyVec<PathBuf>> {
-    // APP0001:00/fan1_label
-    let fan = glob::glob("/sys/devices/pci*/*/*/*/APP0001:00/fan*")?
-        .filter_map(Result::ok)
-        .find(|p| p.exists())
-        .ok_or(Error::NoFan)?;
+    for pattern in FAN_GLOBS {
+        let mut fans = glob::glob(pattern)?
+            .filter_map(std::result::Result::ok)
+            // Resolve through the symlinked bus/class paths so duplicates
+            // collapse to one entry per physical fan.
+            .filter_map(|path| std::fs::canonicalize(path).ok())
+            .filter_map(|mut path| {
+                let file_name = path.file_name()?.to_str()?;
+                let fan_name = file_name.strip_suffix("_input")?;
+                let fan_name_owned = fan_name.to_owned();
+                path.set_file_name(fan_name_owned);
+                Some(path)
+            })
+            .collect::<Vec<_>>();
 
-    // APP0001:00
-    let first_fan_path = fan.parent().ok_or(Error::NoFan)?;
-    // APP0001:00/fan*_input
-    let fan_glob = first_fan_path.display().to_string() + "/fan*_input";
-    // APP0001:00/fan1
-    let fans = glob::glob(&fan_glob)?
-        .filter_map(Result::ok)
-        .filter_map(|mut path| {
-            let file_name = path.file_name()?.to_str()?;
-            let fan_name = file_name.strip_suffix("_input")?;
-            let fan_name_owned = fan_name.to_owned();
-            path.set_file_name(fan_name_owned);
-            Some(path)
-        });
+        // Glob order is not guaranteed, and config sections Fan1..FanN are
+        // zipped positionally against this list. Sort for a stable mapping,
+        // then dedupe in case a pattern reached the same node twice.
+        fans.sort();
+        fans.dedup();
 
-    NonEmptyVec::collect(fans).ok_or(Error::NoFan)
+        if let Some(fans) = NonEmptyVec::from_vec(fans) {
+            println!("neofand: {} fan(s) via {pattern}", fans.len());
+            return Ok(fans);
+        }
+    }
+
+    Err(Error::NoFan)
 }
 
 fn check_pid_file() -> Result<()> {
@@ -97,34 +135,119 @@ fn read_temp_file(temp_file: &mut std::fs::File, temp_buf: &mut String) -> Resul
     temp.map(|t| (t / 1000) as u8)
 }
 
-fn find_temp_file(temps: glob::Paths, temp_buf: &mut String) -> Option<std::fs::File> {
-    for temp_path_res in temps {
-        let Ok(temp_path) = temp_path_res else {
-            eprintln!("Unable to read glob path");
-            continue;
-        };
+/// A group of sensors read together, reduced to their maximum.
+///
+/// Holds both file-backed (hwmon/sysfs) and NVML-backed sources, because NVIDIA
+/// exposes no hwmon node and must be read through its own library.
+struct TempGroup {
+    files: Vec<std::fs::File>,
+    nvidia: Option<nvidia::NvidiaBackend>,
+    history: TempHistory,
+    fall_samples: usize,
+}
 
-        let Ok(mut temp_file) = std::fs::File::open(temp_path) else {
-            eprintln!("Unable to open temperature sensor");
-            continue;
-        };
+impl TempGroup {
+    /// Open a set of already-discovered sensor paths.
+    fn from_paths<I>(label: &str, paths: I, fall_samples: usize, temp_buf: &mut String) -> Self
+    where
+        I: IntoIterator<Item = (PathBuf, String)>,
+    {
+        let mut files = Vec::new();
+        for (path, desc) in paths {
+            let Ok(mut file) = std::fs::File::open(&path) else {
+                eprintln!("neofand: cannot open {}", path.display());
+                continue;
+            };
 
-        if read_temp_file(&mut temp_file, temp_buf).is_ok() {
-            return Some(temp_file);
+            // Only keep sensors that actually parse, so a bogus node cannot
+            // take the daemon down mid-loop.
+            if read_temp_file(&mut file, temp_buf).is_ok() {
+                println!("neofand: {label} sensor {desc}");
+                files.push(file);
+            }
+        }
+
+        Self {
+            files,
+            nvidia: None,
+            history: TempHistory::new(),
+            fall_samples,
         }
     }
 
-    None
-}
+    /// Attach an NVML backend to this group.
+    fn with_nvidia(mut self, nvidia: Option<nvidia::NvidiaBackend>) -> Self {
+        if let Some(backend) = &nvidia {
+            for desc in backend.descriptions() {
+                println!("neofand: gpu sensor {desc}");
+            }
+        }
+        self.nvidia = nvidia;
+        self
+    }
 
-fn find_cpu_temp_file(temp_buf: &mut String) -> Result<std::fs::File> {
-    let temps = glob::glob("/sys/devices/platform/coretemp.0/hwmon/hwmon*/temp1_input")?;
-    find_temp_file(temps, temp_buf).ok_or(Error::NoCpu)
-}
+    fn from_glob(label: &str, pattern: &str, fall_samples: usize, temp_buf: &mut String) -> Self {
+        let paths = glob::glob(pattern)
+            .into_iter()
+            .flatten()
+            .filter_map(std::result::Result::ok)
+            .map(|p| {
+                let desc = p.display().to_string();
+                (p, desc)
+            })
+            .collect::<Vec<_>>();
 
-fn find_gpu_temp_file(temp_buf: &mut String) -> Result<Option<std::fs::File>> {
-    let temps = glob::glob("/sys/class/drm/card0/device/hwmon/hwmon*/temp1_input")?;
-    Ok(find_temp_file(temps, temp_buf))
+        Self::from_paths(label, paths, fall_samples, temp_buf)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.files.is_empty() && self.nvidia.as_ref().map_or(0, nvidia::NvidiaBackend::len) == 0
+    }
+
+    /// Hottest sensor in the group. Empty groups read 0, which yields zero
+    /// demand rather than an error.
+    fn read_max(&mut self, temp_buf: &mut String) -> Result<u8> {
+        let mut max = 0;
+        for file in &mut self.files {
+            let temp = read_temp_file(file, temp_buf)?;
+            if temp > max {
+                max = temp;
+            }
+        }
+
+        if let Some(backend) = &self.nvidia {
+            if let Some(temp) = backend.read_max() {
+                let temp = temp.min(u32::from(u8::MAX)) as u8;
+                if temp > max {
+                    max = temp;
+                }
+            }
+        }
+
+        Ok(max)
+    }
+
+    /// Rise immediately, fall on the trailing average.
+    ///
+    /// A symmetric average would lag a thermal spike by the whole window, and
+    /// junction has been seen to climb ~9 C in 4s. Averaging only the downward
+    /// direction keeps the response prompt while still preventing fan hunting.
+    fn effective(&mut self, temp_buf: &mut String) -> Result<u8> {
+        let now = self.read_max(temp_buf)?;
+        self.history.push_back(now);
+
+        let window = self.fall_samples.min(self.history.len());
+        let sum: u32 = self
+            .history
+            .iter()
+            .rev()
+            .take(window)
+            .map(|t| u32::from(*t))
+            .sum();
+        let mean = (sum / window as u32) as u8;
+
+        Ok(if now >= mean { now } else { mean })
+    }
 }
 
 fn main() -> ExitCode {
@@ -137,54 +260,131 @@ fn main() -> ExitCode {
     }
 }
 
+/// Whether a new sample warrants rewriting the fan targets.
+///
+/// Temperatures are integers so exact comparison is fine, but `PSTR` jitters by
+/// a watt or two at a fixed load, which would otherwise cause a write every
+/// single poll.
+fn readings_changed(old: &Readings, new: &Readings) -> bool {
+    old.gpu != new.gpu
+        || old.cpu != new.cpu
+        || old.psu != new.psu
+        || (old.watts - new.watts).abs() >= 5.0
+}
+
+#[allow(clippy::too_many_arguments)]
 fn start_temp_loop(
     mut temp_buffer: String,
-    mut cpu_temp_file: std::fs::File,
-    mut gpu_temp_file: Option<std::fs::File>,
+    mut gpu_group: TempGroup,
+    mut cpu_group: TempGroup,
+    mut psu_group: TempGroup,
+    smc: Option<&smc::Smc>,
+    cover_mode: CoverMode,
     fans: &NonEmptyVec<FanController>,
+    poll: std::time::Duration,
 ) -> Result<()> {
     let cancellation_token = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(SIGINT, cancellation_token.clone()).map_err(Error::Signal)?;
     signal_hook::flag::register(SIGTERM, cancellation_token.clone()).map_err(Error::Signal)?;
 
-    let mut last_temp = 0;
-    let mut temps = ArrayDeque::<u8, 50, arraydeque::Wrapping>::new();
-    let mut was_long_sleep = false;
+    // Tracked here rather than read back from sysfs: `fan*_manual` is eventually
+    // consistent, so a readback straight after a write still reports the old
+    // value and would make this flip-flop.
+    let mut holding_manual = false;
+    let mut cover_open_last: Option<bool> = None;
+    let mut throttled_last: Option<bool> = None;
+    let mut last: Option<Readings> = None;
+
     while !cancellation_token.load(std::sync::atomic::Ordering::Relaxed) {
-        let cpu_temp = read_temp_file(&mut cpu_temp_file, &mut temp_buffer)?;
-        let temp = if let Some(gpu_temp_file) = &mut gpu_temp_file {
-            let gpu_temp = read_temp_file(gpu_temp_file, &mut temp_buffer)?;
-            if gpu_temp > cpu_temp {
-                gpu_temp
-            } else {
-                cpu_temp
+        // A missing SMC or missing key reads as "closed", so a machine without
+        // cover detection behaves exactly as before rather than refusing to
+        // control the fans.
+        let cover_open = cover_mode != CoverMode::Off
+            && smc
+                .and_then(|smc| smc.flag(smc::KEY_COVER_OPEN))
+                .unwrap_or(false);
+
+        if cover_open && cover_mode == CoverMode::Release {
+            if holding_manual || cover_open_last != Some(true) {
+                for fan in fans {
+                    fan.set_manual(false)?;
+                }
+                holding_manual = false;
+                eprintln!(
+                    "neofand: cover is OPEN — released the fans to the SMC (cover_mode=release)."
+                );
             }
-        } else {
-            cpu_temp
+
+            cover_open_last = Some(true);
+            // Drop history so the curve does not resume from a stale sample.
+            last = None;
+            std::thread::sleep(poll);
+            continue;
+        }
+
+        if cover_open_last != Some(cover_open) {
+            if cover_open {
+                eprintln!(
+                    "neofand: cover is OPEN — holding each fan at its cover-open floor; the \
+                     curve still applies above it."
+                );
+            } else if cover_open_last.is_some() {
+                println!("neofand: cover closed — resuming normal floors");
+            }
+            // Force a write on any transition rather than waiting for the
+            // readings to happen to change.
+            last = None;
+        }
+        cover_open_last = Some(cover_open);
+
+        if !holding_manual {
+            for fan in fans {
+                fan.set_manual(true)?;
+            }
+            holding_manual = true;
+        }
+
+        // Surface the SMC's own GPU throttle state. Checked only with the cover
+        // fitted, because cover-off sets it unconditionally and would just spam.
+        // Any benchmark captured while this is set is not comparable to one
+        // captured without it.
+        let throttled = smc
+            .and_then(|smc| smc.flag(smc::KEY_GPU_THROTTLE))
+            .unwrap_or(false);
+        if throttled_last != Some(throttled) {
+            if throttled {
+                eprintln!(
+                    "neofand: WARNING the SMC is throttling the GPUs ({} is set)",
+                    smc::KEY_GPU_THROTTLE
+                );
+            } else if throttled_last.is_some() {
+                println!("neofand: SMC GPU throttling cleared");
+            }
+            throttled_last = Some(throttled);
+        }
+
+        let readings = Readings {
+            gpu: gpu_group.effective(&mut temp_buffer)?,
+            cpu: cpu_group.effective(&mut temp_buffer)?,
+            psu: psu_group.effective(&mut temp_buffer)?,
+            watts: smc
+                .and_then(|smc| smc.read_f32(smc::KEY_SYSTEM_POWER))
+                .unwrap_or(0.0),
         };
 
-        temps.push_back(temp);
-        if was_long_sleep {
-            // Avoid messing up the mean due to the longer sleep.
-            for _ in 0..9 {
-                temps.push_back(temp);
-            }
-        }
-
-        let sum_temp: u16 = temps.iter().map(|t| *t as u16).sum();
-        let mean_temp = sum_temp / (temps.len() as u16);
-        if mean_temp == last_temp {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            was_long_sleep = true;
-        } else {
-            last_temp = mean_temp;
+        // `map_or(true, ..)` rather than `is_none_or`: Ubuntu ships cargo 1.75
+        // and the README promises that is enough to build.
+        if last
+            .as_ref()
+            .map_or(true, |old| readings_changed(old, &readings))
+        {
+            last = Some(readings);
             for fan in fans {
-                fan.set_speed(fan.calc_speed(mean_temp as u8))?;
+                fan.set_speed(fan.calc_speed(&readings, cover_open))?;
             }
-
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            was_long_sleep = false;
         }
+
+        std::thread::sleep(poll);
     }
 
     Ok(())
@@ -200,17 +400,142 @@ fn real_main() -> Result<()> {
     let mut temp_buffer = String::new();
 
     let fan_paths = find_fan_paths()?;
-    let fans = load_fan_configs(fan_paths)?;
-    let cpu_temp_file = find_cpu_temp_file(&mut temp_buffer)?;
-    let gpu_temp_file = find_gpu_temp_file(&mut temp_buffer)?;
+    let config = load_config(fan_paths.len_nonzero())?;
 
-    println!();
-    for fan in &fans {
-        fan.set_manual(true)?;
+    println!(
+        "neofand: profile={} poll={}s fall_samples={} sensor={}",
+        config.general.profile,
+        config.general.poll_interval.as_secs(),
+        config.general.fall_samples,
+        config.gpu.sensor_preference,
+    );
+
+    // Cover detection and total-system-power both come from raw SMC keys, so
+    // this is optional: without it the daemon still runs, just without the
+    // interlock and with the PSU curve falling back to temperature alone.
+    let smc = smc::Smc::discover();
+    match &smc {
+        Some(smc) if smc.has(smc::KEY_COVER_OPEN) => {}
+        Some(_) => eprintln!(
+            "neofand: WARNING SMC found but no '{}' key — cover interlock disabled. Do not run \
+             with the cover off.",
+            smc::KEY_COVER_OPEN
+        ),
+        None => eprintln!(
+            "neofand: WARNING no SMC key interface — cover interlock disabled. Do not run with \
+             the cover off."
+        ),
+    }
+    if config.general.cover_mode != CoverMode::Off
+        && smc.as_ref().is_some_and(|s| s.has(smc::KEY_COVER_OPEN))
+    {
+        println!(
+            "neofand: cover interlock armed via {} (cover_mode={})",
+            smc::KEY_COVER_OPEN,
+            config.general.cover_mode
+        );
     }
 
-    let res = start_temp_loop(temp_buffer, cpu_temp_file, gpu_temp_file, &fans);
-    println!("T2 Fan Daemon is shutting down...");
+    // Captured before `config.fans` is consumed below.
+    let highest_gpu_high = config
+        .fans
+        .iter()
+        .map(|f| f.gpu_high_temp)
+        .max()
+        .unwrap_or(0);
+
+    let fans = fan_paths
+        .into_iter()
+        .zip(config.fans)
+        .map(|(path, fan_config)| FanController::new(path, fan_config))
+        .collect::<Result<Vec<_>>>()?;
+    let fans = NonEmptyVec::from_vec(fans).ok_or(Error::NoFan)?;
+
+    let gpu_sensors = gpu::discover(&config.gpu)?
+        .into_iter()
+        .map(|s| (s.path, s.desc))
+        .collect::<Vec<_>>();
+
+    let nvidia = if config.gpu.use_nvml {
+        nvidia::NvidiaBackend::init(config.gpu.sensor_preference.wants_memory())
+    } else {
+        None
+    };
+
+    // The profile thresholds assume a ~100 C throttle point (gfx906). NVIDIA
+    // workstation cards typically throttle well below that, so a config that is
+    // safe on AMD can be useless on NVIDIA — the fans would never reach full
+    // speed before the GPU started clocking down. Warn rather than silently
+    // rewrite the user's thresholds.
+    if let Some(slowdown) = nvidia.as_ref().and_then(nvidia::NvidiaBackend::min_slowdown) {
+        if u32::from(highest_gpu_high) >= slowdown {
+            eprintln!(
+                "neofand: WARNING gpu_high_temp={highest_gpu_high} C is at or above the \
+                 NVIDIA slowdown threshold of {slowdown} C — fans will not reach maximum \
+                 until the GPU is already throttling. Lower gpu_high_temp to ~{} C.",
+                slowdown.saturating_sub(8)
+            );
+        }
+    }
+
+    let gpu_group = TempGroup::from_paths(
+        "gpu",
+        gpu_sensors,
+        config.general.fall_samples,
+        &mut temp_buffer,
+    )
+    .with_nvidia(nvidia);
+    let cpu_group = TempGroup::from_glob(
+        "cpu",
+        CPU_TEMP_GLOB,
+        config.general.fall_samples,
+        &mut temp_buffer,
+    );
+
+    // PSU sensors come from the SMC's `Tp*` channels; there is no hwmon
+    // equivalent. Selected by label prefix because the temp*_input numbering
+    // shifts between driver versions.
+    let psu_paths = smc
+        .as_ref()
+        .map(|smc| smc.temp_paths_with_prefix("Tp"))
+        .unwrap_or_default();
+    let psu_group = TempGroup::from_paths(
+        "psu",
+        psu_paths,
+        config.general.fall_samples,
+        &mut temp_buffer,
+    );
+
+    // GPU temperature is the whole point of this fork; refuse to run blind to
+    // it. A missing CPU group is survivable but worth shouting about, since
+    // manual mode means the SMC is no longer ramping for the CPU either.
+    if gpu_group.is_empty() {
+        return Err(Error::NoSensors("gpu"));
+    }
+    if cpu_group.is_empty() {
+        eprintln!("neofand: WARNING no CPU sensors found — fans will follow GPU only");
+    }
+    if psu_group.is_empty() {
+        eprintln!(
+            "neofand: WARNING no PSU (Tp*) sensors found — any psu-source fan will follow total \
+             system power only"
+        );
+    }
+
+    // Manual mode is claimed inside the loop, not here: with the cover off the
+    // interlock must never take it in the first place.
+    let res = start_temp_loop(
+        temp_buffer,
+        gpu_group,
+        cpu_group,
+        psu_group,
+        smc.as_ref(),
+        config.general.cover_mode,
+        &fans,
+        config.general.poll_interval,
+    );
+
+    println!("\nneofand: shutting down, returning fans to SMC control...");
     for fan in fans {
         fan.set_manual(false)?;
     }

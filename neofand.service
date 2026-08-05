@@ -1,0 +1,25 @@
+[Unit]
+Description=neofand — per-component fan control for MacPro7,1
+Documentation=https://github.com/akhilv1/neofand
+# applesmc auto-loads via its MacPro DMI alias, but make the ordering explicit
+# so the SMC fan attributes exist before the daemon looks for them.
+After=systemd-modules-load.service
+Wants=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStartPre=-/sbin/modprobe applesmc
+ExecStart=/usr/local/bin/neofand
+# On stop the daemon writes fan*_manual=0, handing the fans back to the SMC.
+# That is also the failure-safe state, so a crash degrades to stock behaviour.
+#
+# ExecStopPost is the backstop for the one case the daemon cannot clean up after
+# itself: SIGKILL, where no shutdown path runs and the fans would otherwise stay
+# pinned at whatever manual speed was last written. Leading '-' so a failure here
+# cannot block the unit from stopping.
+ExecStopPost=-/bin/sh -c 'for f in /sys/bus/acpi/devices/APP0001:00/fan*_manual; do [ -w "$f" ] && echo 0 > "$f"; done; exit 0'
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

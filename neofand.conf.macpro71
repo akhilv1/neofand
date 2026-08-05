@@ -1,0 +1,85 @@
+# neofand — MacPro7,1 (Mac-27AD2F918AE68F61)
+#
+# Install to /etc/neofand.conf
+#
+# Fan roles were established by physically stalling each fan and watching which
+# fanN_input collapsed. Do not reorder these sections: Fan1..Fan4 are zipped
+# positionally against the sorted fan sysfs paths.
+#
+#   Fan1 = PSU        Fan2 = MPX/GPU bay
+#   Fan3 = MPX/GPU bay    Fan4 = CPU cooler
+
+[General]
+profile=balanced
+poll_interval_secs=1
+fall_samples=20
+# What to do when MSCO reports the cover is off.
+#
+# The danger being guarded against: with the cover removed the T2 pins the fans
+# to 1200/2250 RPM, but fan*_manual=1 overrides that outright and the fans fall
+# to ~500 within 20 s (measured), removing the chassis static pressure the PSU,
+# CPU and MPX modules are cooled by.
+#
+#   floor   - keep control, but never drop below each fan's cover_open_rpm.
+#             Preferred: the curve still ramps ABOVE the floor under real load,
+#             which handing control back cannot do. The T2's cover-off ramp was
+#             only ever observed as a flat 1200/2250 irrespective of temperature,
+#             so it is a safety floor, not a curve.
+#   release - hand fan*_manual back to the T2. Exactly stock behaviour, but gives
+#             up thermal responsiveness while the cover is off.
+#   off     - ignore cover state. Do not use on this hardware.
+cover_mode=floor
+
+[Gpu]
+drivers=amdgpu,radeon,nouveau,i915,xe
+sensor_preference=junction
+extra_temp_paths=
+use_nvml=true
+
+# PSU fan. Driven by total system power (SMC PSTR) as feed-forward with the PSU's
+# own Tp* sensors as the backstop — whichever asks for more air wins.
+#
+# Power leads temperature badly here: a measured 35 W step appeared in PSTR
+# within 1-2 s while the Tp* sensors had not moved at all after 20 s. Curving off
+# temperature alone means the PSU is already hot before the fan reacts.
+#
+# power_low is set above the measured ~195 W idle so the fan actually sits at
+# minimum when the machine is doing nothing.
+#
+# max_rpm overrides the hardware's fan1_max, which reports ~1200 but is wrong:
+# the fan reaches ~1350 RPM when asked for 1600, and the SMC itself drives it to
+# 1522 during a cover-open ramp. Over-requesting is clamped, not rejected.
+[Fan1]
+source=psu
+power_low_watts=250
+power_high_watts=900
+psu_low_temp=45
+psu_high_temp=70
+max_rpm=1500
+# Cover-off floor. 90% of the 1500 ceiling; the T2 uses 1200-1522 here.
+cover_open_rpm=1350
+always_full_speed=false
+
+# MPX bay fans. gfx906 junction throttles at 100 C; thresholds come from the
+# balanced profile (70-90 C), which measured a 92 C peak under sustained load.
+# Which of Fan2/Fan3 serves which bay is not yet known, so both follow the
+# hottest GPU.
+[Fan2]
+source=gpu
+# Matches the T2's own cover-off target for this fan.
+cover_open_rpm=2250
+always_full_speed=false
+
+[Fan3]
+source=gpu
+cover_open_rpm=2250
+always_full_speed=false
+
+# CPU cooler. Thresholds from the balanced profile (60-85 C package). This fan
+# following GPU temperature was the original mis-mapping: on an inference load
+# the CPU idles while the GPUs cook, so it ran fast for no reason — and on a
+# compile it stayed slow when it was the only thing that mattered.
+[Fan4]
+source=cpu
+cover_open_rpm=2250
+always_full_speed=false

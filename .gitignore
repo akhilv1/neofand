@@ -1,6 +1,9 @@
 target
 *.conf
+# ...but the worked MacPro7,1 example is documentation, not local state.
+!neofand.conf.macpro71
 *.pid
 *.py
 .vscode
 /result
+Cargo.toml.bak

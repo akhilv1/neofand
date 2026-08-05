@@ -1,10 +1,10 @@
 [package]
-name = "t2fanrd"
+name = "neofand"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
-description = "Simple Fan Daemon for T2 Macs"
-repository = "https://github.com/GnomedDev/T2FanRD"
+description = "Per-component fan daemon for MacPro7,1 / T2 Macs (fork of T2FanRD)"
+repository = "https://github.com/akhilv1/neofand"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,6 +16,13 @@ rust-ini = { version = "0.21.0", default-features = false }
 thiserror = { version = "1.0.50", default-features = false }
 signal-hook = { version = "0.3.17", default-features = false }
 arraydeque = "0.5.1"
+# Runtime-loaded (libloading) — no build-time NVIDIA dependency, and absent
+# libnvidia-ml.so is a handled error rather than a link failure.
+nvml-wrapper = { version = "0.10", optional = true }
+
+[features]
+default = ["nvidia"]
+nvidia = ["nvml-wrapper"]
 
 [profile.release]
 lto = "thin"

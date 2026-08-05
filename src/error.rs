@@ -4,8 +4,8 @@ pub enum Error {
     NotRoot,
     #[error("Fan not found")]
     NoFan,
-    #[error("CPU temperature sensor not found")]
-    NoCpu,
+    #[error("No {0} temperature sensors found")]
+    NoSensors(&'static str),
 
     #[error("Temperature sensor cannot be read")]
     TempRead(#[source] std::io::Error),
@@ -42,12 +42,9 @@ pub enum Error {
         #[source]
         ini::ParseError,
     ),
-    #[error("Missing Fan{0} in config file")]
-    MissingFanConfig(usize),
-    #[error("Missing {0} in config file")]
-    MissingConfigValue(&'static str),
-    #[error("Invalid {0} in config file")]
-    InvalidConfigValue(&'static str),
+    // Config parsing is deliberately lenient — a missing or malformed key warns
+    // and falls back to the profile default rather than refusing to start, so
+    // there are no "bad config value" error variants here.
 
     #[error("Cannot open fan controller handle")]
     FanOpen(#[source] std::io::Error),
