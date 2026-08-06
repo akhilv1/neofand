@@ -66,6 +66,39 @@ fn demand_watts(watts: f32, low: u16, high: u16) -> f32 {
     (watts - low) / (high - low)
 }
 
+/// One signal feeding a fan's curve, with the thresholds it is measured against.
+pub struct Input {
+    pub name: &'static str,
+    pub unit: &'static str,
+    pub value: f32,
+    pub low: f32,
+    pub high: f32,
+    pub demand: f32,
+}
+
+impl Input {
+    fn temp(name: &'static str, value: u8, low: u8, high: u8) -> Self {
+        Self {
+            name,
+            unit: "C",
+            value: f32::from(value),
+            low: f32::from(low),
+            high: f32::from(high),
+            demand: demand(value, low, high),
+        }
+    }
+}
+
+/// Why a fan is where it is: its curve, its inputs, and which one won.
+pub struct FanExplain {
+    pub curve: String,
+    pub always_full_speed: bool,
+    pub cover_open_rpm: u32,
+    /// The input with the highest demand -- the one that actually set the speed.
+    pub deciding_input: String,
+    pub inputs: Vec<Input>,
+}
+
 /// Duty cycle for a GPU's own fan, from that GPU's own temperature.
 ///
 /// The ramp comes from the `target`, not from `config` directly: thresholds are
@@ -200,6 +233,52 @@ impl FanController {
 
     pub fn source(&self) -> String {
         self.config.source.to_string()
+    }
+
+    /// How this fan's target was arrived at this poll: which sensor(s) its
+    /// `source` selects, the thresholds in play, the live value of each, and the
+    /// resulting 0.0-1.0 demand.
+    ///
+    /// Published so a fan sitting at an unexpected speed can be explained
+    /// without re-deriving the curve by hand -- the mapping from source to
+    /// thresholds is the part that is easy to get wrong when reading a config.
+    pub fn explain(&self, readings: &Readings) -> FanExplain {
+        let c = &self.config;
+        let inputs = match c.source {
+            FanSource::Gpu => vec![Input::temp("gpu", readings.gpu, c.gpu_low_temp, c.gpu_high_temp)],
+            FanSource::Cpu => vec![Input::temp("cpu", readings.cpu, c.cpu_low_temp, c.cpu_high_temp)],
+            FanSource::GpuCpu => vec![
+                Input::temp("gpu", readings.gpu, c.gpu_low_temp, c.gpu_high_temp),
+                Input::temp("cpu", readings.cpu, c.cpu_low_temp, c.cpu_high_temp),
+            ],
+            FanSource::Psu => vec![
+                Input::temp("psu_temp", readings.psu, c.psu_low_temp, c.psu_high_temp),
+                Input {
+                    name: "system_power",
+                    unit: "W",
+                    value: readings.watts,
+                    low: f32::from(c.power_low_watts),
+                    high: f32::from(c.power_high_watts),
+                    demand: demand_watts(readings.watts, c.power_low_watts, c.power_high_watts),
+                },
+            ],
+        };
+
+        // Whichever input asks for most is the one that set the speed. That is
+        // the whole point of the multi-signal sources, and it is invisible from
+        // the resulting RPM alone.
+        let winner = inputs
+            .iter()
+            .max_by(|a, b| a.demand.total_cmp(&b.demand))
+            .map_or("none", |i| i.name);
+
+        FanExplain {
+            curve: c.speed_curve.to_string(),
+            always_full_speed: c.always_full_speed,
+            cover_open_rpm: self.cover_open_speed,
+            deciding_input: winner.to_owned(),
+            inputs,
+        }
     }
 
     pub fn min_speed(&self) -> u32 {

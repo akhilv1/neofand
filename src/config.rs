@@ -7,6 +7,12 @@ const CONFIG_FILE: &str = "./neofand.conf";
 #[cfg(not(debug_assertions))]
 const CONFIG_FILE: &str = "/etc/neofand.conf";
 
+/// The config file this build reads, for the status snapshot.
+#[must_use]
+pub fn config_file_path() -> &'static str {
+    CONFIG_FILE
+}
+
 /// Upper bound on the fall-off window. The runtime value is clamped to this.
 pub const MAX_FALL_SAMPLES: usize = 60;
 

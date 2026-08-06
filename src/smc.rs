@@ -102,6 +102,11 @@ impl Smc {
         std::fs::write(self.dir.join("key_at_index"), index.to_string()).ok()
     }
 
+    /// Number of SMC keys discovered at startup, for the status snapshot.
+    pub fn key_count(&self) -> usize {
+        self.keys.len()
+    }
+
     pub fn has(&self, name: &str) -> bool {
         self.keys.contains_key(name)
     }

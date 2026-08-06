@@ -141,7 +141,9 @@ fn read_temp_file(temp_file: &mut std::fs::File, temp_buf: &mut String) -> Resul
 /// Holds both file-backed (hwmon/sysfs) and NVML-backed sources, because NVIDIA
 /// exposes no hwmon node and must be read through its own library.
 struct TempGroup {
-    files: Vec<std::fs::File>,
+    /// Description alongside each handle, so the status snapshot can report a
+    /// per-sensor breakdown rather than only this group's reduced maximum.
+    files: Vec<(String, std::fs::File)>,
     nvidia: Option<nvidia::NvidiaBackend>,
     history: TempHistory,
     fall_samples: usize,
@@ -172,7 +174,7 @@ impl TempGroup {
             // take the daemon down mid-loop.
             if read_temp_file(&mut file, temp_buf).is_ok() {
                 println!("neofand: {label} sensor {desc}");
-                files.push(file);
+                files.push((desc, file));
             }
         }
 
@@ -217,7 +219,7 @@ impl TempGroup {
     /// demand rather than an error.
     fn read_max(&mut self, temp_buf: &mut String) -> Result<u8> {
         let mut max = 0;
-        for file in &mut self.files {
+        for (_, file) in &mut self.files {
             let temp = read_temp_file(file, temp_buf)?;
             if temp > max {
                 max = temp;
@@ -234,6 +236,26 @@ impl TempGroup {
         }
 
         Ok(max)
+    }
+
+    /// Every individual sensor in this group, for the status snapshot.
+    ///
+    /// Distinct from [`read_max`]: that reduces to one number for the curve,
+    /// which hides *which* of several sensors is the hot one. A failed read is
+    /// skipped rather than propagated -- status must never break control.
+    fn read_each(&mut self, temp_buf: &mut String) -> Vec<(String, u8)> {
+        let mut out = Vec::new();
+        for (desc, file) in &mut self.files {
+            if let Ok(temp) = read_temp_file(file, temp_buf) {
+                out.push((desc.clone(), temp));
+            }
+        }
+        if let Some(backend) = &self.nvidia {
+            for (index, temp) in backend.temps_each() {
+                out.push((format!("nvml [{index}]"), temp));
+            }
+        }
+        out
     }
 
     /// Rise immediately, fall on the trailing average.
@@ -257,6 +279,13 @@ impl TempGroup {
 
         Ok(if now >= mean { now } else { mean })
     }
+}
+
+/// Seconds since the epoch, or 0 if the clock is before it.
+fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 fn main() -> ExitCode {
@@ -325,8 +354,11 @@ fn start_temp_loop(
     gpu_fans: GpuFanConfig,
     status_path: &str,
     profile_name: &str,
+    config_file: &str,
+    fall_samples: usize,
     poll: std::time::Duration,
 ) -> Result<()> {
+    let started = now_unix();
     let cancellation_token = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(SIGINT, cancellation_token.clone()).map_err(Error::Signal)?;
     signal_hook::flag::register(SIGTERM, cancellation_token.clone()).map_err(Error::Signal)?;
@@ -448,16 +480,12 @@ fn start_temp_loop(
                     backend.set_fan_percent(target.index, percent);
 
                     if !status_path.is_empty() {
-                        let (actual_pct, power_w) = backend.observed(target.index);
+                        // Only the target belongs here; everything else about the
+                        // card comes from `full_status()`, which also covers cards
+                        // this daemon does not drive.
                         gpu_fan_status.push(status::GpuFan {
                             index: target.index,
-                            name: backend.name(target.index),
-                            temp_c: target.temp,
-                            target_pct: percent,
-                            actual_pct,
-                            power_w,
-                            ramp_low_c: target.low,
-                            ramp_high_c: target.high,
+                            target_pct: Some(percent),
                         });
                     }
                 }
@@ -467,19 +495,56 @@ fn start_temp_loop(
         // Publish what this poll just read. Failures are swallowed on purpose: a
         // status file that cannot be written must never take fan control down.
         if !status_path.is_empty() {
+            let cards = gpu_group
+                .nvidia()
+                .map(nvidia::NvidiaBackend::full_status)
+                .unwrap_or_default();
+            // Re-read per-sensor values for the breakdown. Cheap sysfs reads, and
+            // it keeps `effective()` above as the single path the curve depends
+            // on rather than teeing off it.
+            let gpu_sensors = gpu_group.read_each(&mut temp_buffer);
+            let cpu_sensors = cpu_group.read_each(&mut temp_buffer);
+            let psu_sensors = psu_group.read_each(&mut temp_buffer);
+
             let snapshot = status::Snapshot {
-                unix_time: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
-                profile: profile_name.to_owned(),
-                poll_secs: poll.as_secs(),
-                cover_open,
-                smc_gpu_throttle: throttled,
-                gpu_c: readings.gpu,
-                cpu_c: readings.cpu,
-                psu_c: readings.psu,
-                system_power_w: readings.watts,
+                unix_time: now_unix(),
+                daemon: status::Daemon {
+                    version: env!("CARGO_PKG_VERSION"),
+                    pid: std::process::id(),
+                    started_unix: started,
+                    uptime_secs: now_unix().saturating_sub(started),
+                    config_file: config_file.to_owned(),
+                    profile: profile_name.to_owned(),
+                    poll_secs: poll.as_secs(),
+                    fall_samples,
+                    cover_mode: cover_mode.to_string(),
+                    holding_manual,
+                    gpu_fan_control: gpu_fans.enabled,
+                },
+                smc: status::Smc {
+                    present: smc.is_some(),
+                    keys: smc.map_or(0, smc::Smc::key_count),
+                    cover_open,
+                    gpu_throttle: throttled,
+                    system_power_w: readings.watts,
+                },
+                groups: vec![
+                    status::TempGroup {
+                        name: "gpu",
+                        effective_c: readings.gpu,
+                        sensors: gpu_sensors,
+                    },
+                    status::TempGroup {
+                        name: "cpu",
+                        effective_c: readings.cpu,
+                        sensors: cpu_sensors,
+                    },
+                    status::TempGroup {
+                        name: "psu",
+                        effective_c: readings.psu,
+                        sensors: psu_sensors,
+                    },
+                ],
                 chassis_fans: fans
                     .into_iter()
                     .enumerate()
@@ -490,9 +555,11 @@ fn start_temp_loop(
                         actual_rpm: f.actual_rpm(),
                         min_rpm: f.min_speed(),
                         max_rpm: f.max_speed(),
+                        explain: f.explain(&readings),
                     })
                     .collect(),
-                gpu_fans: gpu_fan_status,
+                cards,
+                gpu_targets: gpu_fan_status,
             };
             let _ = snapshot.publish(std::path::Path::new(status_path));
         }
@@ -686,6 +753,8 @@ fn real_main() -> Result<()> {
         config.gpu_fans,
         &config.general.status_path,
         &config.general.profile.to_string(),
+        config::config_file_path(),
+        config.general.fall_samples,
         config.general.poll_interval,
     );
 

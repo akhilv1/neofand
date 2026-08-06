@@ -411,25 +411,40 @@ written by an external poller.
 
 ## Querying it
 
-`neofand --status` prints a snapshot of every sensor and fan, without touching
-the daemon:
+`neofand --status` prints the daemon's complete state — every sensor, every fan,
+every card — without touching it:
 
 ```console
 $ neofand --status
 {
-  "unix_time": 1785992286,
-  "profile": "turbo",
-  "cover_open": false,
-  "smc_gpu_throttle": false,
-  "sensors": { "gpu_c": 64, "cpu_c": 58, "psu_c": 46, "system_power_w": 651.3 },
+  "daemon": { "version": "0.1.0", "pid": 68527, "uptime_secs": 3,
+              "config_file": "/etc/neofand.conf", "profile": "turbo",
+              "poll_secs": 1, "fall_samples": 20, "cover_mode": "floor",
+              "holding_manual": true, "gpu_fan_control": true },
+  "smc":    { "present": true, "keys": 1363, "cover_open": false,
+              "gpu_throttle": false, "system_power_w": 646.9 },
+  "temps": {
+    "gpu": { "effective_c": 64, "sensors": [
+      {"sensor": "amdgpu 0000:0b:00.0 temp2_input (junction)", "temp_c": 52},
+      {"sensor": "nvml [0]", "temp_c": 64}, ... ] },
+    "cpu": { "effective_c": 61, "sensors": [...] },
+    "psu": { "effective_c": 47, "sensors": [{"sensor": "Tp2F", "temp_c": 47}, ...] }
+  },
   "chassis_fans": [
-    {"fan": 1, "source": "psu", "target_rpm": 1350, "actual_rpm": 1367, "min_rpm": 500, "max_rpm": 1500},
-    ...
+    { "fan": 1, "source": "psu", "curve": "logarithmic",
+      "target_rpm": 1348, "actual_rpm": 1344, "min_rpm": 500, "max_rpm": 1500,
+      "cover_open_rpm": 1350, "always_full_speed": false,
+      "deciding_input": "system_power",
+      "inputs": [
+        {"name": "psu_temp",     "unit": "C", "value":  47.0, "low":  45.0, "high":  70.0, "demand": 0.080},
+        {"name": "system_power", "unit": "W", "value": 646.9, "low": 250.0, "high": 900.0, "demand": 0.611}
+      ] }, ...
   ],
-  "gpu_fans": [
-    {"index": 0, "name": "NVIDIA RTX A6000", "temp_c": 63, "target_pct": 52,
-     "actual_pct": 53, "power_w": 113.1, "ramp_low_c": 55, "ramp_high_c": 80},
-    ...
+  "cards": [
+    {"index": 0, "name": "NVIDIA RTX A6000", "bus_id": "00000000:14:00.0",
+     "temp_c": 64, "mem_temp_c": null, "power_w": 112.3, "fans": 1,
+     "controllable": true, "fan_target_pct": 55, "fan_actual_pct": 52,
+     "ramp_low_c": 55, "ramp_high_c": 80, "slowdown_c": 95}, ...
   ]
 }
 ```
@@ -439,6 +454,35 @@ The daemon republishes this every poll to `status_path` (default
 file, so it needs no privileges and cannot disturb anything. Any other reader
 works equally well — `jq . /run/neofand.status.json`, a Prometheus textfile
 collector, whatever.
+
+### Reading it
+
+**`temps` breaks each group down per sensor**, not just the reduced maximum the
+curve consumes. `effective_c` is what the curve sees, after the trailing-average
+fall filter. The individual entries show which sensor is actually the hot one —
+above, the gpu group reads 64 °C because of the NVIDIA cards while the two Vega
+dies sit at 52 °C, which is why `fan2`/`fan3` (the MPX bays) are following the
+NVIDIA cards.
+
+**`inputs` and `deciding_input` explain each fan's speed.** A `source` maps to
+one or two signals, each with its own thresholds, and the higher demand wins —
+that arbitration is invisible from the resulting RPM. Above, `fan1` is at 1348
+because *power* wants 0.611 while PSU temperature only wants 0.080, exactly the
+feed-forward behaviour [described below](#psu-fan-and-total-system-power).
+
+**`cards` lists every NVML card**, including any with `controllable: false` — a
+card with no fan NVML will expose is still read for temperature and still drives
+the chassis fans, so omitting it would hide a real heat source. `ramp_low_c` /
+`ramp_high_c` are the per-card values derived from that card's own `slowdown_c`.
+
+### target vs actual
+
+Both are published for every fan and every card deliberately. `fan1_max`
+under-reports on MacPro7,1 (see
+[`max_rpm`](#max_rpm-and-why-hardware-maxima-are-not-trustworthy)), and a card can
+decline a fan request, so a fan that cannot reach what it was asked for is only
+visible by comparing the two. Expect a few seconds of divergence after startup
+while fans spin up — that is ramp, not shortfall.
 
 ### Why a file and not a socket
 
@@ -453,13 +497,6 @@ accept woven through the control loop. The file avoids both: the daemon already
 reads every sensor each poll, so publishing is just serialising what it holds.
 The write is temp-file-plus-`rename`, which is atomic, so a reader sees either
 the previous complete snapshot or the next one — never a partial one.
-
-### target vs actual
-
-Both are published for every fan deliberately. `fan1_max` under-reports on
-MacPro7,1 (see [`max_rpm`](#max_rpm-and-why-hardware-maxima-are-not-trustworthy)),
-and a card can decline a fan request, so a fan that cannot reach what it was
-asked for is only visible by comparing the two.
 
 ## Full configuration
 

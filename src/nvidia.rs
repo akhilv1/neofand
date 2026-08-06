@@ -37,6 +37,24 @@ mod imp {
     /// the handles the safe wrapper hands out.
     const NVML_LIB: &str = "libnvidia-ml.so.1";
 
+    /// Full per-card detail for the status snapshot.
+    pub struct CardStatus {
+        pub index: u32,
+        pub name: String,
+        pub bus_id: String,
+        pub temp_c: Option<u8>,
+        pub mem_temp_c: Option<u32>,
+        pub power_w: Option<f32>,
+        pub fan_actual_pct: Option<u32>,
+        pub fans: u32,
+        pub slowdown_c: Option<u32>,
+        pub ramp_low_c: u8,
+        pub ramp_high_c: u8,
+        /// False for a card with no fan NVML will expose, or when the fan
+        /// setters are unavailable. Such a card is still read for temperature.
+        pub controllable: bool,
+    }
+
     /// A card that can be driven this cycle, with the ramp resolved for it.
     pub struct FanTarget {
         pub index: u32,
@@ -205,27 +223,69 @@ mod imp {
             self.raw.is_some() && self.devices.iter().any(|d| d.fans > 0)
         }
 
-        /// Model name for a card, for the status snapshot.
-        pub fn name(&self, index: u32) -> String {
-            self.nvml
-                .device_by_index(index)
-                .and_then(|d| d.name())
-                .unwrap_or_else(|_| "unknown".to_owned())
+        /// `(index, °C)` for every NVML card, including ones with no
+        /// controllable fan -- those still contribute to the chassis curve, so
+        /// omitting them from the breakdown would hide a real heat source.
+        pub fn temps_each(&self) -> Vec<(u32, u8)> {
+            let mut out = Vec::new();
+            for info in &self.devices {
+                let Ok(device) = self.nvml.device_by_index(info.index) else {
+                    continue;
+                };
+                if let Ok(temp) = device.temperature(TemperatureSensor::Gpu) {
+                    out.push((info.index, u8::try_from(temp).unwrap_or(u8::MAX)));
+                }
+            }
+            out
         }
 
-        /// What the card reports right now: fan duty and power draw.
+        /// Everything known about every card, for the status snapshot.
         ///
-        /// Published alongside the target the curve asked for, so a card that is
-        /// not honouring a request is visible. Both are `None` on a failed read
-        /// rather than propagating -- status must never break control.
-        pub fn observed(&self, index: u32) -> (Option<u32>, Option<f32>) {
-            let Ok(device) = self.nvml.device_by_index(index) else {
-                return (None, None);
-            };
-            let fan = device.fan_speed(0).ok();
-            let power = device.power_usage().ok().map(|mw| mw as f32 / 1000.0);
-            (fan, power)
+        /// Includes cards this daemon does *not* drive (`fans == 0`), flagged by
+        /// `controllable`, so the snapshot describes the machine rather than
+        /// just the subset under control.
+        pub fn full_status(&self) -> Vec<CardStatus> {
+            let mut out = Vec::new();
+            for info in &self.devices {
+                let Ok(device) = self.nvml.device_by_index(info.index) else {
+                    continue;
+                };
+                let mem_temp_c = if self.read_memory {
+                    device
+                        .field_values_for(&[FieldId(NVML_FI_DEV_MEMORY_TEMP)])
+                        .ok()
+                        .and_then(|s| {
+                            s.into_iter()
+                                .flatten()
+                                .find_map(|v| v.value.ok().and_then(sample_to_temp))
+                        })
+                } else {
+                    None
+                };
+                out.push(CardStatus {
+                    index: info.index,
+                    name: device.name().unwrap_or_else(|_| "unknown".to_owned()),
+                    bus_id: device
+                        .pci_info()
+                        .map(|p| p.bus_id)
+                        .unwrap_or_else(|_| "unknown".to_owned()),
+                    temp_c: device
+                        .temperature(TemperatureSensor::Gpu)
+                        .ok()
+                        .map(|t| u8::try_from(t).unwrap_or(u8::MAX)),
+                    mem_temp_c,
+                    power_w: device.power_usage().ok().map(|mw| mw as f32 / 1000.0),
+                    fan_actual_pct: device.fan_speed(0).ok(),
+                    fans: info.fans,
+                    slowdown_c: info.slowdown,
+                    ramp_low_c: info.fan_low,
+                    ramp_high_c: info.fan_high,
+                    controllable: info.fans > 0 && self.raw.is_some(),
+                });
+            }
+            out
         }
+
 
         /// Pin every fan on one GPU to `percent`.
         ///
@@ -349,9 +409,30 @@ mod imp {
         pub high: u8,
     }
 
+    pub struct CardStatus {
+        pub index: u32,
+        pub name: String,
+        pub bus_id: String,
+        pub temp_c: Option<u8>,
+        pub mem_temp_c: Option<u32>,
+        pub power_w: Option<f32>,
+        pub fan_actual_pct: Option<u32>,
+        pub fans: u32,
+        pub slowdown_c: Option<u32>,
+        pub ramp_low_c: u8,
+        pub ramp_high_c: u8,
+        pub controllable: bool,
+    }
+
     impl NvidiaBackend {
         pub fn init(_read_memory: bool, _gpu_fans: GpuFanConfig) -> Option<Self> {
             None
+        }
+        pub fn temps_each(&self) -> Vec<(u32, u8)> {
+            Vec::new()
+        }
+        pub fn full_status(&self) -> Vec<CardStatus> {
+            Vec::new()
         }
         pub fn descriptions(&self) -> Vec<String> {
             Vec::new()
@@ -373,13 +454,7 @@ mod imp {
         }
         pub fn set_fan_percent(&self, _index: u32, _percent: u8) {}
         pub fn restore_fans(&self) {}
-        pub fn name(&self, _index: u32) -> String {
-            "unknown".to_owned()
-        }
-        pub fn observed(&self, _index: u32) -> (Option<u32>, Option<f32>) {
-            (None, None)
-        }
     }
 }
 
-pub use imp::{FanTarget, NvidiaBackend};
+pub use imp::{CardStatus, FanTarget, NvidiaBackend};
