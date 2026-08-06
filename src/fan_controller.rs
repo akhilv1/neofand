@@ -27,6 +27,11 @@ pub struct FanController {
     manual_file: std::fs::File,
     output_file: std::fs::File,
     config: FanConfig,
+    /// Base sysfs path (`.../fanN`), kept so the status snapshot can read
+    /// `fanN_input` back. Target and actual are both worth publishing: on
+    /// MacPro7,1 `fan1_max` under-reports, so a fan that cannot reach what it
+    /// was asked for is only visible by comparing the two.
+    base_path: PathBuf,
 
     min_speed: u32,
     max_speed: u32,
@@ -120,7 +125,7 @@ impl FanController {
             .map_err(Error::FanOpen)?;
 
         let output_file = open_options
-            .open(join_suffix(path, "_output"))
+            .open(join_suffix(path.clone(), "_output"))
             .map_err(Error::FanOpen)?;
 
         // Default to 90% of maximum, which is where the T2 puts fans 2-4 during
@@ -135,6 +140,7 @@ impl FanController {
             manual_file,
             output_file,
             config,
+            base_path: path,
             min_speed,
             max_speed,
             cover_open_speed,
@@ -179,6 +185,29 @@ impl FanController {
             this.cover_open_speed
         );
         Ok(this)
+    }
+
+    /// Current RPM from `fanN_input`, for the status snapshot.
+    ///
+    /// `None` rather than an error on a failed read: a status field that cannot
+    /// be populated must not be able to interrupt fan control.
+    pub fn actual_rpm(&self) -> Option<u32> {
+        let mut path = self.base_path.clone();
+        let name = path.file_name()?.to_str()?.to_owned();
+        path.set_file_name(format!("{name}_input"));
+        std::fs::read_to_string(path).ok()?.trim().parse().ok()
+    }
+
+    pub fn source(&self) -> String {
+        self.config.source.to_string()
+    }
+
+    pub fn min_speed(&self) -> u32 {
+        self.min_speed
+    }
+
+    pub fn max_speed(&self) -> u32 {
+        self.max_speed
     }
 
     pub fn set_manual(&self, enabled: bool) -> Result<()> {

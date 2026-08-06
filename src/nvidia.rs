@@ -205,6 +205,28 @@ mod imp {
             self.raw.is_some() && self.devices.iter().any(|d| d.fans > 0)
         }
 
+        /// Model name for a card, for the status snapshot.
+        pub fn name(&self, index: u32) -> String {
+            self.nvml
+                .device_by_index(index)
+                .and_then(|d| d.name())
+                .unwrap_or_else(|_| "unknown".to_owned())
+        }
+
+        /// What the card reports right now: fan duty and power draw.
+        ///
+        /// Published alongside the target the curve asked for, so a card that is
+        /// not honouring a request is visible. Both are `None` on a failed read
+        /// rather than propagating -- status must never break control.
+        pub fn observed(&self, index: u32) -> (Option<u32>, Option<f32>) {
+            let Ok(device) = self.nvml.device_by_index(index) else {
+                return (None, None);
+            };
+            let fan = device.fan_speed(0).ok();
+            let power = device.power_usage().ok().map(|mw| mw as f32 / 1000.0);
+            (fan, power)
+        }
+
         /// Pin every fan on one GPU to `percent`.
         ///
         /// A failure on one fan is reported and the rest are still attempted:
@@ -351,6 +373,12 @@ mod imp {
         }
         pub fn set_fan_percent(&self, _index: u32, _percent: u8) {}
         pub fn restore_fans(&self) {}
+        pub fn name(&self, _index: u32) -> String {
+            "unknown".to_owned()
+        }
+        pub fn observed(&self, _index: u32) -> (Option<u32>, Option<f32>) {
+            (None, None)
+        }
     }
 }
 

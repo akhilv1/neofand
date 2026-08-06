@@ -37,6 +37,7 @@ mod fan_controller;
 mod gpu;
 mod nvidia;
 mod smc;
+mod status;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("This tool is only developed for Linux systems.");
@@ -259,6 +260,38 @@ impl TempGroup {
 }
 
 fn main() -> ExitCode {
+    // `--status` is a plain reader of the published snapshot -- it never talks to
+    // the daemon, which is the whole point: querying cannot disturb fan control.
+    // It also needs no privileges, unlike the daemon itself.
+    let mut args = std::env::args().skip(1);
+    if let Some(flag) = args.next() {
+        return match flag.as_str() {
+            "--status" => {
+                let path = args.next().unwrap_or_else(|| {
+                    config::GeneralConfig::default().status_path
+                });
+                match status::print(std::path::Path::new(&path)) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(err) => {
+                        eprintln!("neofand: cannot read {path}: {err}");
+                        eprintln!("  is the daemon running, and is status_path set in [General]?");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            "--help" | "-h" => {
+                println!("neofand -- per-component fan daemon");
+                println!("  neofand                    run the daemon (needs root)");
+                println!("  neofand --status [PATH]    print the latest sensor snapshot");
+                ExitCode::SUCCESS
+            }
+            other => {
+                eprintln!("neofand: unknown argument {other}; try --help");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
     match real_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
@@ -290,6 +323,8 @@ fn start_temp_loop(
     cover_mode: CoverMode,
     fans: &NonEmptyVec<FanController>,
     gpu_fans: GpuFanConfig,
+    status_path: &str,
+    profile_name: &str,
     poll: std::time::Duration,
 ) -> Result<()> {
     let cancellation_token = Arc::new(AtomicBool::new(false));
@@ -397,6 +432,7 @@ fn start_temp_loop(
         // `readings_changed` gate above: that compares the *reduced* group
         // maximum, so one card warming while the hottest holds steady leaves
         // the readings equal and would skip this card's ramp entirely.
+        let mut gpu_fan_status = Vec::new();
         if gpu_fans.enabled {
             if let Some(backend) = gpu_group.nvidia() {
                 for target in backend.fan_targets() {
@@ -410,8 +446,55 @@ fn start_temp_loop(
                         percent
                     };
                     backend.set_fan_percent(target.index, percent);
+
+                    if !status_path.is_empty() {
+                        let (actual_pct, power_w) = backend.observed(target.index);
+                        gpu_fan_status.push(status::GpuFan {
+                            index: target.index,
+                            name: backend.name(target.index),
+                            temp_c: target.temp,
+                            target_pct: percent,
+                            actual_pct,
+                            power_w,
+                            ramp_low_c: target.low,
+                            ramp_high_c: target.high,
+                        });
+                    }
                 }
             }
+        }
+
+        // Publish what this poll just read. Failures are swallowed on purpose: a
+        // status file that cannot be written must never take fan control down.
+        if !status_path.is_empty() {
+            let snapshot = status::Snapshot {
+                unix_time: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+                profile: profile_name.to_owned(),
+                poll_secs: poll.as_secs(),
+                cover_open,
+                smc_gpu_throttle: throttled,
+                gpu_c: readings.gpu,
+                cpu_c: readings.cpu,
+                psu_c: readings.psu,
+                system_power_w: readings.watts,
+                chassis_fans: fans
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, f)| status::ChassisFan {
+                        number: i + 1,
+                        source: f.source(),
+                        target_rpm: f.calc_speed(&readings, cover_open),
+                        actual_rpm: f.actual_rpm(),
+                        min_rpm: f.min_speed(),
+                        max_rpm: f.max_speed(),
+                    })
+                    .collect(),
+                gpu_fans: gpu_fan_status,
+            };
+            let _ = snapshot.publish(std::path::Path::new(status_path));
         }
 
         std::thread::sleep(poll);
@@ -601,6 +684,8 @@ fn real_main() -> Result<()> {
         config.general.cover_mode,
         &fans,
         config.gpu_fans,
+        &config.general.status_path,
+        &config.general.profile.to_string(),
         config.general.poll_interval,
     );
 

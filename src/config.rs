@@ -346,9 +346,18 @@ impl SensorPreference {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+// Clone, not Copy: `status_path` is a String. Nothing copies this by value in a
+// hot path -- it is read once at startup.
+#[derive(Clone, Debug)]
 pub struct GeneralConfig {
     pub profile: Profile,
+    /// Where to publish the sensor snapshot each poll. Empty disables it.
+    ///
+    /// A file rather than a socket so that reading it cannot perturb the control
+    /// loop -- see `status.rs`. It is the only way to reach SMC `PSTR` while the
+    /// daemon is running, since scanning `key_at_index` for it would corrupt the
+    /// daemon's own reads.
+    pub status_path: String,
     pub poll_interval: Duration,
     pub fall_samples: usize,
     /// How to handle the cover being off. See [`CoverMode`].
@@ -359,6 +368,8 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             profile: Profile::Balanced,
+            // Alongside /run/neofand.pid; needs no directory of its own.
+            status_path: "/run/neofand.status.json".to_owned(),
             // Junction has been observed climbing ~9 C in 4 s under a dense
             // compute load, so polling must be brisk.
             poll_interval: Duration::from_secs(1),
@@ -530,6 +541,7 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
 
     let general = GeneralConfig {
         profile,
+        status_path: get_or(general_section, "status_path", defaults.status_path.clone()),
         poll_interval: Duration::from_secs(poll_secs.max(1)),
         fall_samples: fall_samples.clamp(1, MAX_FALL_SAMPLES),
         // `cover_interlock=false` is honoured as a legacy alias for the old
@@ -612,7 +624,8 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
             general.poll_interval.as_secs().to_string(),
         )
         .set("fall_samples", general.fall_samples.to_string())
-        .set("cover_mode", general.cover_mode.to_string());
+        .set("cover_mode", general.cover_mode.to_string())
+        .set("status_path", general.status_path.clone());
 
     file.with_section(Some("Gpu"))
         .set("drivers", gpu.drivers.join(","))

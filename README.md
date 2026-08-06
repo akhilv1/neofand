@@ -409,6 +409,58 @@ For anything neither hwmon nor NVML covers, `extra_temp_paths` takes globs
 pointing at any file containing a millidegree-Celsius integer — including one
 written by an external poller.
 
+## Querying it
+
+`neofand --status` prints a snapshot of every sensor and fan, without touching
+the daemon:
+
+```console
+$ neofand --status
+{
+  "unix_time": 1785992286,
+  "profile": "turbo",
+  "cover_open": false,
+  "smc_gpu_throttle": false,
+  "sensors": { "gpu_c": 64, "cpu_c": 58, "psu_c": 46, "system_power_w": 651.3 },
+  "chassis_fans": [
+    {"fan": 1, "source": "psu", "target_rpm": 1350, "actual_rpm": 1367, "min_rpm": 500, "max_rpm": 1500},
+    ...
+  ],
+  "gpu_fans": [
+    {"index": 0, "name": "NVIDIA RTX A6000", "temp_c": 63, "target_pct": 52,
+     "actual_pct": 53, "power_w": 113.1, "ramp_low_c": 55, "ramp_high_c": 80},
+    ...
+  ]
+}
+```
+
+The daemon republishes this every poll to `status_path` (default
+`/run/neofand.status.json`); set it empty to disable. `--status` just reads that
+file, so it needs no privileges and cannot disturb anything. Any other reader
+works equally well — `jq . /run/neofand.status.json`, a Prometheus textfile
+collector, whatever.
+
+### Why a file and not a socket
+
+`system_power_w` is SMC `PSTR`, total system power. Reaching it directly means
+scanning `key_at_index` — 887 of 1363 keys on this machine — and that register is
+a *single shared index*, so an external scan corrupts the daemon's own reads
+mid-flight (see [`smc.rs`](src/smc.rs)). Before this existed, the only honest way
+to sample total power was to stop the daemon first.
+
+A socket would have meant a second thread touching that state, or a non-blocking
+accept woven through the control loop. The file avoids both: the daemon already
+reads every sensor each poll, so publishing is just serialising what it holds.
+The write is temp-file-plus-`rename`, which is atomic, so a reader sees either
+the previous complete snapshot or the next one — never a partial one.
+
+### target vs actual
+
+Both are published for every fan deliberately. `fan1_max` under-reports on
+MacPro7,1 (see [`max_rpm`](#max_rpm-and-why-hardware-maxima-are-not-trustworthy)),
+and a card can decline a fan request, so a fan that cannot reach what it was
+asked for is only visible by comparing the two.
+
 ## Full configuration
 
 `/etc/neofand.conf`, generated on first run if absent.
@@ -419,6 +471,7 @@ profile=balanced          ; quiet | balanced | turbo | custom
 poll_interval_secs=1      ; minimum 1
 fall_samples=20           ; trailing-average window, max 60
 cover_mode=floor          ; floor | release | off  — see Cover detection
+status_path=/run/neofand.status.json   ; sensor snapshot; empty disables
 
 [Gpu]
 drivers=amdgpu,radeon,nouveau,i915,xe
