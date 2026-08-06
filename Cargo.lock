@@ -150,6 +150,7 @@ dependencies = [
  "libc",
  "nonempty",
  "nvml-wrapper",
+ "nvml-wrapper-sys",
  "rust-ini",
  "signal-hook",
  "thiserror",

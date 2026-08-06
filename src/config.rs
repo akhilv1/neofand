@@ -10,7 +10,7 @@ const CONFIG_FILE: &str = "/etc/neofand.conf";
 /// Upper bound on the fall-off window. The runtime value is clamped to this.
 pub const MAX_FALL_SAMPLES: usize = 60;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpeedCurve {
     Linear,
     Exponential,
@@ -371,7 +371,109 @@ impl Default for GeneralConfig {
 pub struct Config {
     pub general: GeneralConfig,
     pub gpu: GpuConfig,
+    pub gpu_fans: GpuFanConfig,
     pub fans: Vec<FanConfig>,
+}
+
+/// Control of the GPUs' **own** fans, as opposed to the chassis fans.
+///
+/// Separate from `[FanN]` because the units and the topology both differ: these
+/// are per-card duty-cycle percentages, not chassis RPM, and each card follows
+/// its own die rather than the hottest one in the box. On MacPro7,1 that
+/// distinction is measurable — under a 300 W burn GPU2 sat 4-6 C cooler than
+/// GPU0/GPU1 purely from slot airflow, so a shared curve would over-drive one
+/// card or under-drive the others.
+///
+/// Off by default: this takes fan control away from the card firmware, and a
+/// daemon that grabs it uninvited on every machine that happens to have an
+/// NVIDIA GPU is not a safe default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GpuFanConfig {
+    pub enabled: bool,
+    /// Ramp start, °C. `0` means derive it from the card's own slowdown
+    /// threshold — see [`AUTO_HIGH_MARGIN`].
+    pub low_temp: u8,
+    /// Full speed at this temperature, °C. `0` means derive it, as above.
+    pub high_temp: u8,
+    /// Duty floor. Clamped up to [`MIN_USEFUL_PERCENT`], below which a blower
+    /// moves too little air to cool a loaded card.
+    pub min_percent: u8,
+    pub max_percent: u8,
+    pub curve: SpeedCurve,
+}
+
+/// Degrees below a card's slowdown threshold at which its fan reaches maximum.
+///
+/// The fan has to be at full speed *before* the card starts clocking down,
+/// otherwise it is reacting to throttling rather than preventing it. Measured on
+/// this hardware: the A6000s report a 95 C slowdown and were picking up
+/// sw-thermal at 88 C on the stock curve, so the ramp has to finish comfortably
+/// under that.
+pub const AUTO_HIGH_MARGIN: u8 = 15;
+
+/// Width of the derived ramp, in degrees below `high_temp`.
+pub const AUTO_RAMP_WIDTH: u8 = 25;
+
+/// Duty cycle below which a GPU blower is not usefully cooling anything.
+pub const MIN_USEFUL_PERCENT: u8 = 30;
+
+/// Fallback ramp for a card whose driver will not report a slowdown threshold.
+/// Deliberately conservative: it ramps early rather than trusting an unknown.
+pub const FALLBACK_LOW: u8 = 50;
+pub const FALLBACK_HIGH: u8 = 75;
+
+impl GpuFanConfig {
+    /// Resolve the ramp for one card, given the slowdown threshold NVML reports
+    /// for it (`None` when the driver will not say).
+    ///
+    /// Auto-derivation is per-card on purpose: thresholds vary by model, so a
+    /// box with mixed GPUs needs a different curve for each rather than one
+    /// tuned to whichever card happened to be measured.
+    pub fn resolve_ramp(&self, slowdown: Option<u32>) -> (u8, u8) {
+        // An explicit pair in the config always wins; auto only fills in what
+        // was left at 0.
+        if self.low_temp > 0 && self.high_temp > 0 {
+            return (self.low_temp, self.high_temp);
+        }
+
+        let high = match slowdown {
+            Some(slowdown) => u8::try_from(slowdown)
+                .unwrap_or(u8::MAX)
+                .saturating_sub(AUTO_HIGH_MARGIN),
+            None => FALLBACK_HIGH,
+        };
+        let low = high.saturating_sub(AUTO_RAMP_WIDTH);
+
+        // A partially-specified pair keeps whichever half was given.
+        let low = if self.low_temp > 0 { self.low_temp } else { low };
+        let high = if self.high_temp > 0 {
+            self.high_temp
+        } else {
+            high
+        };
+
+        // Guard against a config or a threshold that inverts the pair, which
+        // would make `demand` return 0 forever and silently disable the ramp.
+        if high <= low {
+            (FALLBACK_LOW, FALLBACK_HIGH)
+        } else {
+            (low, high)
+        }
+    }
+}
+
+impl Default for GpuFanConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            // 0 = derive per card from its own slowdown threshold.
+            low_temp: 0,
+            high_temp: 0,
+            min_percent: MIN_USEFUL_PERCENT,
+            max_percent: 100,
+            curve: SpeedCurve::Linear,
+        }
+    }
 }
 
 /// Read a key, warning and falling back rather than failing.
@@ -474,9 +576,26 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         });
     }
 
+    let gpu_fan_section = file.section(Some("GpuFans"));
+    let gpu_fan_defaults = GpuFanConfig::default();
+    let gpu_fans = GpuFanConfig {
+        enabled: get_or(gpu_fan_section, "enabled", gpu_fan_defaults.enabled),
+        low_temp: get_or(gpu_fan_section, "low_temp", gpu_fan_defaults.low_temp),
+        high_temp: get_or(gpu_fan_section, "high_temp", gpu_fan_defaults.high_temp),
+        // Clamped rather than rejected, for the same reason as every other key
+        // here: a bad value should degrade to something safe, not stop the
+        // daemon. The floor is 30 because a slower blower cannot cool the card.
+        min_percent: get_or(gpu_fan_section, "min_percent", gpu_fan_defaults.min_percent)
+            .clamp(MIN_USEFUL_PERCENT, 100),
+        max_percent: get_or(gpu_fan_section, "max_percent", gpu_fan_defaults.max_percent)
+            .clamp(MIN_USEFUL_PERCENT, 100),
+        curve: get_or(gpu_fan_section, "curve", gpu_fan_defaults.curve),
+    };
+
     Ok(Config {
         general,
         gpu,
+        gpu_fans,
         fans,
     })
 }
@@ -501,6 +620,17 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
         .set("extra_temp_paths", gpu.extra_temp_paths.join(","))
         .set("use_nvml", gpu.use_nvml.to_string());
 
+    // Written out disabled, with the thresholds visible, so the keys are
+    // discoverable without reaching for the README.
+    let gpu_fans = GpuFanConfig::default();
+    file.with_section(Some("GpuFans"))
+        .set("enabled", gpu_fans.enabled.to_string())
+        .set("low_temp", gpu_fans.low_temp.to_string())
+        .set("high_temp", gpu_fans.high_temp.to_string())
+        .set("min_percent", gpu_fans.min_percent.to_string())
+        .set("max_percent", gpu_fans.max_percent.to_string())
+        .set("curve", gpu_fans.curve.to_string());
+
     // Fan sections are written empty on purpose. Thresholds come from the
     // profile, so writing them here would silently pin the fans to whatever
     // profile happened to be active at first run and make `profile=` inert.
@@ -516,6 +646,7 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
     Ok(Config {
         general,
         gpu,
+        gpu_fans,
         fans: vec![base; fan_count.get()],
     })
 }
@@ -525,5 +656,64 @@ pub fn load_config(fan_count: NonZeroUsize) -> Result<Config> {
         Ok(file_raw) => parse(&file_raw, fan_count),
         Err(err) if err.kind() == ErrorKind::NotFound => generate(fan_count),
         Err(err) => Err(Error::ConfigRead(err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cfg(low: u8, high: u8) -> GpuFanConfig {
+        GpuFanConfig {
+            low_temp: low,
+            high_temp: high,
+            ..GpuFanConfig::default()
+        }
+    }
+
+    #[test]
+    fn derives_ramp_from_slowdown() {
+        // The A6000s report 95 C, which is what these constants were chosen
+        // against: a 55-80 C ramp finishes well before the card clocks down.
+        assert_eq!(cfg(0, 0).resolve_ramp(Some(95)), (55, 80));
+    }
+
+    #[test]
+    fn derives_per_card_rather_than_globally() {
+        // The point of deriving at all: two different cards get two different
+        // ramps from the same config.
+        let config = cfg(0, 0);
+        assert_ne!(config.resolve_ramp(Some(95)), config.resolve_ramp(Some(83)));
+        assert_eq!(config.resolve_ramp(Some(83)), (43, 68));
+    }
+
+    #[test]
+    fn explicit_config_wins_over_derivation() {
+        assert_eq!(cfg(60, 85).resolve_ramp(Some(95)), (60, 85));
+    }
+
+    #[test]
+    fn half_specified_pair_derives_only_the_other_half() {
+        assert_eq!(cfg(70, 0).resolve_ramp(Some(95)), (70, 80));
+        assert_eq!(cfg(0, 90).resolve_ramp(Some(95)), (55, 90));
+    }
+
+    #[test]
+    fn unknown_slowdown_uses_fallback() {
+        assert_eq!(cfg(0, 0).resolve_ramp(None), (FALLBACK_LOW, FALLBACK_HIGH));
+    }
+
+    #[test]
+    fn inverted_pair_falls_back_instead_of_disabling_the_ramp() {
+        // `demand` returns 0.0 forever when high <= low, which would leave the
+        // fan pinned at min_percent and look like fan control simply not working.
+        assert_eq!(cfg(90, 0).resolve_ramp(Some(95)), (FALLBACK_LOW, FALLBACK_HIGH));
+    }
+
+    #[test]
+    fn absurdly_low_slowdown_does_not_underflow() {
+        // saturating_sub, not `-`: a card claiming a 10 C slowdown must not wrap.
+        let (low, high) = cfg(0, 0).resolve_ramp(Some(10));
+        assert!(low < high, "ramp must stay ordered, got {low}-{high}");
     }
 }

@@ -27,6 +27,23 @@ mod imp {
         sys_exports::field_id::NVML_FI_DEV_MEMORY_TEMP,
         Nvml,
     };
+    use nvml_wrapper_sys::bindings::{nvmlReturn_enum_NVML_SUCCESS, NvmlLib};
+
+    use crate::config::GpuFanConfig;
+
+    /// Where the driver's own `libnvidia-ml.so` lives. Loading it a second time
+    /// is safe: NVML reference-counts initialisation, and `dlopen` of an
+    /// already-loaded object returns the same object, so this shares state with
+    /// the handles the safe wrapper hands out.
+    const NVML_LIB: &str = "libnvidia-ml.so.1";
+
+    /// A card that can be driven this cycle, with the ramp resolved for it.
+    pub struct FanTarget {
+        pub index: u32,
+        pub temp: u8,
+        pub low: u8,
+        pub high: u8,
+    }
 
     /// One NVML-visible GPU.
     struct NvDevice {
@@ -35,12 +52,27 @@ mod imp {
         /// Temperature at which this GPU begins hardware throttling, if the
         /// driver reports it. Used to sanity-check the configured thresholds.
         slowdown: Option<u32>,
+        /// Controllable fans on this card. 0 means the card exposes none (fully
+        /// passive, or a driver that will not report them), and it is then
+        /// skipped for fan control while still being read for temperature.
+        fans: u32,
+        /// This card's own ramp, resolved once at startup from the config and
+        /// this card's slowdown threshold. Per-card rather than global so a box
+        /// with mixed GPUs gets a correct curve for each.
+        fan_low: u8,
+        fan_high: u8,
     }
 
     pub struct NvidiaBackend {
         nvml: Nvml,
         devices: Vec<NvDevice>,
         read_memory: bool,
+        /// Raw bindings, used only for the fan setters. `nvml-wrapper` 0.10
+        /// exposes `num_fans` but no way to write a fan speed, so those three
+        /// entry points are called directly. `None` when the symbols are absent
+        /// (older driver), which downgrades fan control to a no-op rather than
+        /// failing the daemon.
+        raw: Option<NvmlLib>,
     }
 
     fn sample_to_temp(value: SampleValue) -> Option<u32> {
@@ -56,7 +88,7 @@ mod imp {
     impl NvidiaBackend {
         /// Returns `None` when no NVIDIA driver is present, which is not an
         /// error — it is the normal case on an AMD-only machine.
-        pub fn init(read_memory: bool) -> Option<Self> {
+        pub fn init(read_memory: bool, gpu_fans: GpuFanConfig) -> Option<Self> {
             let nvml = match Nvml::init() {
                 Ok(nvml) => nvml,
                 Err(err) => {
@@ -93,15 +125,27 @@ mod imp {
                     .temperature_threshold(TemperatureThreshold::Slowdown)
                     .ok();
 
+                let fans = device.num_fans().unwrap_or(0);
+                let (fan_low, fan_high) = gpu_fans.resolve_ramp(slowdown);
+
                 let mut desc = format!("nvml [{index}] {name}");
                 if let Some(slowdown) = slowdown {
                     desc.push_str(&format!(" (slowdown {slowdown} C)"));
+                }
+                if fans > 0 {
+                    desc.push_str(&format!(
+                        " ({fans} fan{}, ramp {fan_low}-{fan_high} C)",
+                        if fans == 1 { "" } else { "s" }
+                    ));
                 }
 
                 devices.push(NvDevice {
                     index,
                     desc,
                     slowdown,
+                    fans,
+                    fan_low,
+                    fan_high,
                 });
             }
 
@@ -110,11 +154,106 @@ mod imp {
                 return None;
             }
 
+            // Safety: loading the driver's own library by soname. Failure is
+            // handled, and a `None` here only disables fan control.
+            let raw = match unsafe { NvmlLib::new(NVML_LIB) } {
+                Ok(lib) => Some(lib),
+                Err(err) => {
+                    eprintln!("neofand: NVML fan control unavailable ({err}); temperature only");
+                    None
+                }
+            };
+
             Some(Self {
                 nvml,
                 devices,
                 read_memory,
+                raw,
             })
+        }
+
+        /// One entry per fan-capable card: its index, current temperature, and
+        /// the ramp resolved for it.
+        ///
+        /// Distinct from [`read_max`]: chassis fans want the hottest card, but a
+        /// card's own blower wants that card's own die. Cards in poorer slots run
+        /// several degrees hotter, so collapsing these to a maximum would drive
+        /// every fan from the worst card in the box.
+        pub fn fan_targets(&self) -> Vec<FanTarget> {
+            let mut out = Vec::with_capacity(self.devices.len());
+            for info in &self.devices {
+                if info.fans == 0 {
+                    continue;
+                }
+                let Ok(device) = self.nvml.device_by_index(info.index) else {
+                    continue;
+                };
+                if let Ok(temp) = device.temperature(TemperatureSensor::Gpu) {
+                    out.push(FanTarget {
+                        index: info.index,
+                        temp: u8::try_from(temp).unwrap_or(u8::MAX),
+                        low: info.fan_low,
+                        high: info.fan_high,
+                    });
+                }
+            }
+            out
+        }
+
+        /// True when at least one card has a fan this daemon could drive.
+        pub fn has_controllable_fans(&self) -> bool {
+            self.raw.is_some() && self.devices.iter().any(|d| d.fans > 0)
+        }
+
+        /// Pin every fan on one GPU to `percent`.
+        ///
+        /// A failure on one fan is reported and the rest are still attempted:
+        /// leaving some fans pinned and others on the firmware curve because of
+        /// an early return would be worse than a partial application.
+        pub fn set_fan_percent(&self, index: u32, percent: u8) {
+            self.for_each_fan(index, |lib, handle, fan| unsafe {
+                lib.nvmlDeviceSetFanSpeed_v2(handle, fan, u32::from(percent))
+            });
+        }
+
+        /// Hand every fan on every GPU back to the card's own curve.
+        ///
+        /// Must be called on shutdown. Manual fan settings persist in the driver
+        /// after the process exits, so skipping this leaves the blowers pinned
+        /// at whatever was last written — the same failure the unit file's
+        /// `ExecStopPost` guards against for the chassis fans.
+        pub fn restore_fans(&self) {
+            for info in &self.devices {
+                self.for_each_fan(info.index, |lib, handle, fan| unsafe {
+                    lib.nvmlDeviceSetDefaultFanSpeed_v2(handle, fan)
+                });
+            }
+        }
+
+        fn for_each_fan<F>(&self, index: u32, mut apply: F)
+        where
+            F: FnMut(&NvmlLib, nvml_wrapper_sys::bindings::nvmlDevice_t, u32) -> u32,
+        {
+            let Some(lib) = &self.raw else { return };
+            let Some(info) = self.devices.iter().find(|d| d.index == index) else {
+                return;
+            };
+            if info.fans == 0 {
+                return;
+            }
+            let Ok(device) = self.nvml.device_by_index(index) else {
+                return;
+            };
+
+            // Safety: the handle is valid for as long as NVML stays initialised,
+            // which it does for the lifetime of `self`.
+            let handle = unsafe { device.handle() };
+            for fan in 0..info.fans {
+                let rc = apply(lib, handle, fan);
+                if rc != nvmlReturn_enum_NVML_SUCCESS {
+                    eprintln!("neofand: NVML fan write failed on GPU{index} fan{fan} (rc {rc})");
+                }
+            }
         }
 
         pub fn descriptions(&self) -> Vec<String> {
@@ -175,12 +314,21 @@ mod imp {
 
 #[cfg(not(feature = "nvidia"))]
 mod imp {
+    use crate::config::GpuFanConfig;
+
     /// Stub used when the `nvidia` feature is disabled, so the call sites in
     /// `main.rs` need no `cfg` handling.
     pub struct NvidiaBackend;
 
+    pub struct FanTarget {
+        pub index: u32,
+        pub temp: u8,
+        pub low: u8,
+        pub high: u8,
+    }
+
     impl NvidiaBackend {
-        pub fn init(_read_memory: bool) -> Option<Self> {
+        pub fn init(_read_memory: bool, _gpu_fans: GpuFanConfig) -> Option<Self> {
             None
         }
         pub fn descriptions(&self) -> Vec<String> {
@@ -195,7 +343,15 @@ mod imp {
         pub fn read_max(&self) -> Option<u32> {
             None
         }
+        pub fn fan_targets(&self) -> Vec<FanTarget> {
+            Vec::new()
+        }
+        pub fn has_controllable_fans(&self) -> bool {
+            false
+        }
+        pub fn set_fan_percent(&self, _index: u32, _percent: u8) {}
+        pub fn restore_fans(&self) {}
     }
 }
 
-pub use imp::NvidiaBackend;
+pub use imp::{FanTarget, NvidiaBackend};

@@ -330,12 +330,78 @@ per-fan thresholds is the cleanest way to pin NVIDIA-appropriate values.
 
 ### What this does and does not control
 
-neofand drives **chassis/system fans**. It does not attempt to control an NVIDIA
-card's own fan: NVIDIA gates that behind X11 with `Coolbits` via
-`nvidia-settings`, which is awkward on a headless compute box, and blower-style
-cards manage their own fan curve in firmware perfectly well. The value here is
-making chassis airflow respond to GPU load so the card has cool intake air and
-its exhaust actually leaves the case.
+neofand drives **chassis/system fans**, and — with `[GpuFans] enabled=true` — the
+NVIDIA cards' **own** fans as well. See [GPU fan control](#gpu-fan-control).
+
+Chassis control is still the more important half: it makes airflow respond to GPU
+load so the card has cool intake air and its exhaust actually leaves the case.
+No card fan can compensate for hot intake.
+
+## GPU fan control
+
+Off by default. Taking fan control from the card firmware is not a safe thing to
+do uninvited on every machine that happens to have an NVIDIA GPU, so it must be
+asked for.
+
+This does **not** go through X11 and `Coolbits`/`nvidia-settings`. It calls
+`nvmlDeviceSetFanSpeed_v2` directly, so it works headless with no X server,
+no `DISPLAY`, and no session — which matters for a daemon that starts before
+anyone logs in. (`nvml-wrapper` exposes no fan setters, so the three fan entry
+points are called through the raw `nvml-wrapper-sys` bindings it already
+depends on. Reads and device handles still come from the safe wrapper.)
+
+### Why it exists: the firmware curve leaves performance on the table
+
+Measured on this hardware, 3x RTX A6000, sustained cuBLAS TF32 SGEMM on all
+three cards at a 300 W per-card limit:
+
+| | stock firmware curve | neofand `[GpuFans]` |
+|---|---|---|
+| GPU0 / GPU1 | 88 C at ~57% fan | **79 C at 97% fan** |
+| GPU2 | 84 C | **73 C at 80% fan** |
+| combined draw | 836 W | **855 W** |
+| `sw-thermal` asserted | yes, GPU0+GPU1 | no |
+
+At 88 C the top two cards picked up `sw-thermal` and fell back to 268/274 W —
+*below their own power limit*. They were giving up roughly 25 W each to heat
+while their blowers sat at 57%. The firmware curve is tuned to protect the card,
+not to keep it at its limit, and those are different goals.
+
+### Each card follows its own die
+
+Per-card, not driven by the hottest card in the box. On this machine GPU2 sits
+4-6 C cooler than GPU0/GPU1 purely from slot airflow, and runs its fan at 80%
+while the others are at 97%. A shared curve would either over-drive GPU2 or
+under-cool the other two.
+
+### Thresholds are derived per card
+
+With `low_temp=0`/`high_temp=0` (the default) the ramp is computed from the
+slowdown threshold **NVML reports for that specific card**:
+
+```
+high_temp = slowdown - 15      # fan is at maximum before the card clocks down
+low_temp  = high_temp - 25
+```
+
+The A6000s report a 95 C slowdown, giving a 55-80 C ramp. A box with mixed GPUs
+gets a correct curve for each rather than one tuned to whichever card was
+measured. Set either key to a non-zero value to override that half explicitly;
+an inverted or nonsensical pair falls back to a conservative 50-75 C rather than
+silently disabling the ramp.
+
+A card reporting no controllable fans is skipped for control but still read for
+temperature, so it continues to drive the chassis fans.
+
+### Restoring control
+
+Manual fan settings **persist in the driver after the process exits** — that is
+NVML's behaviour, not a bug. A clean shutdown calls
+`nvmlDeviceSetDefaultFanSpeed_v2` and logs `returned GPU fans to the driver
+curve`. Note the asymmetry with the chassis fans: those have `ExecStopPost` in
+the unit as a SIGKILL backstop, but there is no equivalent net for NVML, so a
+`SIGKILL` leaves the card fans wherever they were last set. To recover, restart
+the daemon and stop it cleanly, or set the fans back with `nvidia-settings`.
 
 ### GPUs NVML cannot see
 
@@ -359,6 +425,14 @@ drivers=amdgpu,radeon,nouveau,i915,xe
 sensor_preference=junction
 extra_temp_paths=
 use_nvml=true             ; NVIDIA via NVML; harmless with no NVIDIA driver
+
+[GpuFans]                 ; the NVIDIA cards' OWN fans — see GPU fan control
+enabled=false             ; off by default: takes control from card firmware
+low_temp=0                ; 0 = derive per card from its slowdown threshold
+high_temp=0               ; 0 = derive (slowdown - 15)
+min_percent=30            ; duty floor; clamped up to 30 (below that moves no air)
+max_percent=100
+curve=linear              ; linear | exponential | logarithmic
 
 [Fan1]
 source=psu                ; gpu | cpu | psu | gpu+cpu   (default gpu+cpu)

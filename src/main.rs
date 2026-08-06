@@ -28,7 +28,7 @@ use fan_controller::{FanController, Readings};
 use nonempty::NonEmpty as NonEmptyVec;
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use config::{load_config, CoverMode, MAX_FALL_SAMPLES};
+use config::{load_config, CoverMode, GpuFanConfig, MAX_FALL_SAMPLES};
 use error::{Error, Result};
 
 mod config;
@@ -147,6 +147,14 @@ struct TempGroup {
 }
 
 impl TempGroup {
+    /// The NVML backend, when this group has one.
+    ///
+    /// Exposed so the control loop can drive the NVIDIA cards' own fans, which
+    /// needs per-device temperatures rather than this group's reduced maximum.
+    fn nvidia(&self) -> Option<&nvidia::NvidiaBackend> {
+        self.nvidia.as_ref()
+    }
+
     /// Open a set of already-discovered sensor paths.
     fn from_paths<I>(label: &str, paths: I, fall_samples: usize, temp_buf: &mut String) -> Self
     where
@@ -281,6 +289,7 @@ fn start_temp_loop(
     smc: Option<&smc::Smc>,
     cover_mode: CoverMode,
     fans: &NonEmptyVec<FanController>,
+    gpu_fans: GpuFanConfig,
     poll: std::time::Duration,
 ) -> Result<()> {
     let cancellation_token = Arc::new(AtomicBool::new(false));
@@ -384,7 +393,38 @@ fn start_temp_loop(
             }
         }
 
+        // The cards' own fans, driven per-card. Deliberately outside the
+        // `readings_changed` gate above: that compares the *reduced* group
+        // maximum, so one card warming while the hottest holds steady leaves
+        // the readings equal and would skip this card's ramp entirely.
+        if gpu_fans.enabled {
+            if let Some(backend) = gpu_group.nvidia() {
+                for target in backend.fan_targets() {
+                    let percent = fan_controller::gpu_fan_percent(&target, &gpu_fans);
+                    let percent = if cover_open {
+                        // Same argument as the chassis cover-open floor: with the
+                        // cover off there is no chassis static pressure, so the
+                        // card's own blower is doing all the work.
+                        percent.max(gpu_fans.max_percent)
+                    } else {
+                        percent
+                    };
+                    backend.set_fan_percent(target.index, percent);
+                }
+            }
+        }
+
         std::thread::sleep(poll);
+    }
+
+    // Hand the cards' fans back before returning. The chassis fans have the
+    // unit's `ExecStopPost` as a SIGKILL backstop; NVML settings have no such
+    // net, so a clean exit must undo them explicitly.
+    if gpu_fans.enabled {
+        if let Some(backend) = gpu_group.nvidia() {
+            backend.restore_fans();
+            println!("neofand: returned GPU fans to the driver curve");
+        }
     }
 
     Ok(())
@@ -457,7 +497,10 @@ fn real_main() -> Result<()> {
         .collect::<Vec<_>>();
 
     let nvidia = if config.gpu.use_nvml {
-        nvidia::NvidiaBackend::init(config.gpu.sensor_preference.wants_memory())
+        nvidia::NvidiaBackend::init(
+            config.gpu.sensor_preference.wants_memory(),
+            config.gpu_fans,
+        )
     } else {
         None
     };
@@ -475,6 +518,31 @@ fn real_main() -> Result<()> {
                  until the GPU is already throttling. Lower gpu_high_temp to ~{} C.",
                 slowdown.saturating_sub(8)
             );
+        }
+    }
+
+    if config.gpu_fans.enabled {
+        match nvidia.as_ref() {
+            Some(backend) if backend.has_controllable_fans() => println!(
+                // Per-card ramps are reported next to each card in the sensor
+                // lines above, since with auto-derivation they can differ.
+                "neofand: GPU fans {}-{}%, {}, ramp {} (per-card, each follows its own die)",
+                config.gpu_fans.min_percent,
+                config.gpu_fans.max_percent,
+                config.gpu_fans.curve,
+                if config.gpu_fans.low_temp == 0 || config.gpu_fans.high_temp == 0 {
+                    "auto-derived from each card's slowdown threshold"
+                } else {
+                    "from config"
+                },
+            ),
+            // Enabled but unusable is worth saying out loud: the cards are then
+            // still on their firmware curve, which is the thing the setting was
+            // turned on to replace.
+            _ => eprintln!(
+                "neofand: WARNING [GpuFans] enabled but no NVIDIA card exposes a controllable \
+                 fan — the cards stay on their own firmware curve"
+            ),
         }
     }
 
@@ -532,6 +600,7 @@ fn real_main() -> Result<()> {
         smc.as_ref(),
         config.general.cover_mode,
         &fans,
+        config.gpu_fans,
         config.general.poll_interval,
     );
 

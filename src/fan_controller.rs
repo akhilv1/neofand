@@ -4,7 +4,8 @@ use std::{
 };
 
 use crate::{
-    config::{FanConfig, FanSource, SpeedCurve},
+    config::{FanConfig, FanSource, GpuFanConfig, SpeedCurve},
+    nvidia::FanTarget,
     error::{Error, Result},
 };
 
@@ -58,6 +59,26 @@ fn demand_watts(watts: f32, low: u16, high: u16) -> f32 {
     }
 
     (watts - low) / (high - low)
+}
+
+/// Duty cycle for a GPU's own fan, from that GPU's own temperature.
+///
+/// The ramp comes from the `target`, not from `config` directly: thresholds are
+/// resolved per-card at startup, so a card whose ramp was auto-derived from its
+/// own slowdown point keeps that ramp. See `GpuFanConfig::resolve_ramp`.
+///
+/// Shares [`demand`] and the curve shaping with the chassis fans so the two
+/// behave identically; only the output unit differs (percent, not RPM).
+pub fn gpu_fan_percent(target: &FanTarget, config: &GpuFanConfig) -> u8 {
+    let raw = demand(target.temp, target.low, target.high);
+    let shaped = match config.curve {
+        SpeedCurve::Linear => raw,
+        SpeedCurve::Exponential => raw * raw * raw,
+        SpeedCurve::Logarithmic => raw.cbrt(),
+    };
+
+    let (min, max) = (config.min_percent, config.max_percent.max(config.min_percent));
+    min + (shaped * f32::from(max - min)) as u8
 }
 
 impl FanController {
