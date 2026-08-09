@@ -53,6 +53,14 @@ mod imp {
         /// False for a card with no fan NVML will expose, or when the fan
         /// setters are unavailable. Such a card is still read for temperature.
         pub controllable: bool,
+        /// VRAM in use and total, in bytes. Read for telemetry rather than fan
+        /// control -- correlating a memory-resident model against the power
+        /// zones is the reason to have it.
+        pub mem_used_bytes: Option<u64>,
+        pub mem_total_bytes: Option<u64>,
+        /// Core and memory-controller busy percentages.
+        pub util_gpu_pct: Option<u32>,
+        pub util_mem_pct: Option<u32>,
     }
 
     /// A card that can be driven this cycle, with the ramp resolved for it.
@@ -262,6 +270,10 @@ mod imp {
                 } else {
                     None
                 };
+                // Both are plain NVML reads with no side effects; failures stay
+                // `None` rather than dropping the whole card from the status.
+                let memory = device.memory_info().ok();
+                let utilization = device.utilization_rates().ok();
                 out.push(CardStatus {
                     index: info.index,
                     name: device.name().unwrap_or_else(|_| "unknown".to_owned()),
@@ -281,6 +293,10 @@ mod imp {
                     ramp_low_c: info.fan_low,
                     ramp_high_c: info.fan_high,
                     controllable: info.fans > 0 && self.raw.is_some(),
+                    mem_used_bytes: memory.as_ref().map(|m| m.used),
+                    mem_total_bytes: memory.as_ref().map(|m| m.total),
+                    util_gpu_pct: utilization.as_ref().map(|u| u.gpu),
+                    util_mem_pct: utilization.as_ref().map(|u| u.memory),
                 });
             }
             out
@@ -422,6 +438,10 @@ mod imp {
         pub ramp_low_c: u8,
         pub ramp_high_c: u8,
         pub controllable: bool,
+        pub mem_used_bytes: Option<u64>,
+        pub mem_total_bytes: Option<u64>,
+        pub util_gpu_pct: Option<u32>,
+        pub util_mem_pct: Option<u32>,
     }
 
     impl NvidiaBackend {

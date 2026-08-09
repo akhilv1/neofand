@@ -398,11 +398,105 @@ impl Default for GeneralConfig {
     }
 }
 
+/// Persist every sensor the daemon reads to a local SQLite database.
+///
+/// Off by default. The daemon's job is fan control; a store that grows without
+/// being asked for is not something a fan daemon should do uninvited.
+///
+/// ## Why this lives in the daemon rather than a separate collector
+///
+/// `smc.rs` documents the constraint: `key_at_index` is a single shared index
+/// register, so only one process can read raw SMC keys. The daemon already holds
+/// that role. An external logger would have to either corrupt the daemon's reads
+/// or stop it — which is why the `P*` power zones were unreachable while the
+/// daemon ran, until now.
+pub struct LoggingConfig {
+    pub enabled: bool,
+    pub db_path: String,
+    /// How often to write a sample. Independent of `poll_interval`: fan control
+    /// wants 1 s reactions, but a year of 1 Hz rows across ~360 metrics is tens
+    /// of GB for resolution nothing reads back.
+    pub interval: Duration,
+    pub retention_days: u32,
+    /// Minimum change before a reading is written again. Suppresses the large
+    /// idle majority of channels that never move.
+    ///
+    /// Discrete flags (`GTHR`, `MSCO`, `PZ*T`) bypass this entirely and are
+    /// always written on change — a throttle trip between two samples is exactly
+    /// the event worth having, and a deadband would swallow it.
+    pub deadband_temp_c: f64,
+    pub deadband_power_w: f64,
+    pub deadband_rpm: f64,
+    /// Write an unchanged reading anyway after this long, so a flat channel
+    /// still has anchor points and charts do not interpolate across hours.
+    pub heartbeat_secs: u64,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            db_path: "/var/lib/neofand/telemetry.db".to_owned(),
+            interval: Duration::from_secs(10),
+            retention_days: 365,
+            deadband_temp_c: 0.5,
+            deadband_power_w: 1.0,
+            deadband_rpm: 20.0,
+            heartbeat_secs: 300,
+        }
+    }
+}
+
+/// Dashboard, JSON query API, and the control plane.
+pub struct WebConfig {
+    pub enabled: bool,
+    /// Defaults to loopback. Exposes the machine's full thermal and power
+    /// history, so widening it is an explicit choice rather than a default.
+    ///
+    /// **Bind to a specific Tailscale address, never `0.0.0.0`, when control is
+    /// enabled.** Authorization identifies the caller by its tailnet address; if
+    /// the listener also accepts LAN packets, a local host can forge a `100.x`
+    /// source address and be mistaken for a tailnet peer. Binding to the
+    /// tailscale0 address means the packet must have come through the tunnel.
+    pub bind: String,
+    /// Permit the POST control endpoints (reboot, boot device) at all.
+    pub allow_control: bool,
+    /// Tailscale login names allowed to use them, e.g. `akhil@example.com`.
+    ///
+    /// Membership of the tailnet is deliberately *not* sufficient: a tailnet
+    /// commonly has several people on it, and rebooting this machine should not
+    /// be available to all of them.
+    pub control_users: Vec<String>,
+    /// systemd units to report health for on the services tab.
+    pub services: Vec<String>,
+    /// `name=url` HTTP probes, for things that do not run under systemd.
+    pub probes: Vec<(String, String)>,
+    /// Electricity price per kWh, in whatever currency you think in. 0 disables
+    /// the cost readout and leaves the energy chart in watt-hours only.
+    pub cost_per_kwh: f64,
+}
+
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: "127.0.0.1:9977".to_owned(),
+            allow_control: false,
+            control_users: Vec::new(),
+            services: Vec::new(),
+            probes: Vec::new(),
+            cost_per_kwh: 0.0,
+        }
+    }
+}
+
 pub struct Config {
     pub general: GeneralConfig,
     pub gpu: GpuConfig,
     pub gpu_fans: GpuFanConfig,
     pub fans: Vec<FanConfig>,
+    pub logging: LoggingConfig,
+    pub web: WebConfig,
 }
 
 /// Control of the GPUs' **own** fans, as opposed to the chassis fans.
@@ -650,11 +744,68 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         curve: get_or(gpu_fan_section, "curve", gpu_fan_defaults.curve),
     };
 
+    let logging_section = file.section(Some("Logging"));
+    let logging_defaults = LoggingConfig::default();
+    let logging_secs: u64 = get_or(
+        logging_section,
+        "interval_secs",
+        logging_defaults.interval.as_secs(),
+    );
+    let logging = LoggingConfig {
+        enabled: get_or(logging_section, "enabled", logging_defaults.enabled),
+        db_path: get_or(logging_section, "db_path", logging_defaults.db_path.clone()),
+        interval: Duration::from_secs(logging_secs.max(1)),
+        retention_days: get_or(
+            logging_section,
+            "retention_days",
+            logging_defaults.retention_days,
+        ),
+        deadband_temp_c: get_or(
+            logging_section,
+            "deadband_temp_c",
+            logging_defaults.deadband_temp_c,
+        ),
+        deadband_power_w: get_or(
+            logging_section,
+            "deadband_power_w",
+            logging_defaults.deadband_power_w,
+        ),
+        deadband_rpm: get_or(logging_section, "deadband_rpm", logging_defaults.deadband_rpm),
+        heartbeat_secs: get_or(
+            logging_section,
+            "heartbeat_secs",
+            logging_defaults.heartbeat_secs,
+        ),
+    };
+
+    let web_section = file.section(Some("Web"));
+    let web_defaults = WebConfig::default();
+    let web = WebConfig {
+        enabled: get_or(web_section, "enabled", web_defaults.enabled),
+        bind: get_or(web_section, "bind", web_defaults.bind.clone()),
+        allow_control: get_or(web_section, "allow_control", web_defaults.allow_control),
+        control_users: get_list(web_section, "control_users", Vec::new()),
+        services: get_list(web_section, "services", Vec::new()),
+        // `name=url,name=url`. Entries without an `=` are dropped rather than
+        // guessed at, so a typo shows up as a missing probe instead of a probe
+        // pointing somewhere unintended.
+        probes: get_list(web_section, "probes", Vec::new())
+            .into_iter()
+            .filter_map(|entry| {
+                let (name, url) = entry.split_once('=')?;
+                Some((name.trim().to_owned(), url.trim().to_owned()))
+            })
+            .collect(),
+        cost_per_kwh: get_or(web_section, "cost_per_kwh", web_defaults.cost_per_kwh),
+    };
+
     Ok(Config {
         general,
         gpu,
         gpu_fans,
         fans,
+        logging,
+        web,
     })
 }
 
@@ -708,6 +859,8 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
         gpu,
         gpu_fans,
         fans: vec![base; fan_count.get()],
+        logging: LoggingConfig::default(),
+        web: WebConfig::default(),
     })
 }
 

@@ -36,9 +36,21 @@ mod config;
 mod error;
 mod fan_controller;
 mod gpu;
+#[cfg(feature = "logging")]
+mod logdb;
 mod nvidia;
 mod smc;
 mod status;
+#[cfg(feature = "logging")]
+mod telemetry;
+#[cfg(feature = "web")]
+mod control;
+#[cfg(feature = "web")]
+mod services;
+#[cfg(feature = "web")]
+mod tsauth;
+#[cfg(feature = "web")]
+mod web;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("This tool is only developed for Linux systems.");
@@ -423,6 +435,7 @@ fn start_temp_loop(
     config_file: &str,
     fall_samples: usize,
     poll: std::time::Duration,
+    telemetry: &mut TelemetrySink,
 ) -> Result<()> {
     let started = now_unix();
     let cancellation_token = Arc::new(AtomicBool::new(false));
@@ -630,6 +643,10 @@ fn start_temp_loop(
             let _ = snapshot.publish(std::path::Path::new(status_path));
         }
 
+        // Independent of `status_path`, and rate-limited internally to the
+        // logging interval rather than the poll interval.
+        record_telemetry(telemetry, smc, fans, &readings, cover_open, &gpu_group);
+
         std::thread::sleep(poll);
     }
 
@@ -701,6 +718,12 @@ fn real_main() -> Result<()> {
     // for it by leaving both thresholds at 0. Done per fan rather than globally
     // so a fan with explicit numbers keeps them.
     let derived = config::GpuFanConfig::derive_chassis_ramp(gpu_limit);
+    // Started here, before `config` is picked apart below and before the loop
+    // claims the fans, so a misconfigured database or an already-bound port is
+    // reported up front rather than mid-run.
+    let mut telemetry = telemetry_init(&config.logging, smc.as_ref());
+    web_init(&config.web, &config.logging);
+
     let mut config_fans = config.fans;
     for fan in &mut config_fans {
         if fan.gpu_low_temp != 0 || fan.gpu_high_temp != 0 {
@@ -864,6 +887,7 @@ fn real_main() -> Result<()> {
         config::config_file_path(),
         config.general.fall_samples,
         config.general.poll_interval,
+        &mut telemetry,
     );
 
     println!("\nneofand: shutting down, returning fans to SMC control...");
@@ -876,4 +900,214 @@ fn real_main() -> Result<()> {
         (Err(err), _) | (_, Err(err)) => Err(err),
         (Ok(()), Ok(())) => Ok(()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry sink
+//
+// Two feature-selected shapes so the control loop has exactly one call site and
+// no inline `cfg`. With `logging` off these compile to a unit type and empty
+// functions, which optimise away entirely.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "logging")]
+struct Telemetry {
+    logger: logdb::Logger,
+    collector: telemetry::Collector,
+    /// CPU/memory sampling keeps rate state between samples, so it is owned here
+    /// rather than constructed per poll.
+    host: telemetry::HostLoad,
+    hwmon: telemetry::Hwmon,
+    interval: std::time::Duration,
+    last: Option<std::time::Instant>,
+}
+
+#[cfg(feature = "logging")]
+type TelemetrySink = Option<Telemetry>;
+#[cfg(not(feature = "logging"))]
+type TelemetrySink = ();
+
+#[cfg(feature = "logging")]
+fn telemetry_init(logging: &config::LoggingConfig, smc: Option<&smc::Smc>) -> TelemetrySink {
+    if !logging.enabled {
+        return None;
+    }
+
+    // The SMC is the point of this store -- the `P*` zone data is unreachable
+    // from any other process while the daemon runs. Without it there is little
+    // worth logging, so say so rather than quietly recording a thin subset.
+    let Some(smc) = smc else {
+        eprintln!("neofand: telemetry enabled but no SMC was found — not logging");
+        return None;
+    };
+
+    let collector = telemetry::Collector::new(smc);
+    let hwmon = telemetry::Hwmon::discover();
+    match logdb::Logger::spawn(logging) {
+        Ok(logger) => {
+            eprintln!(
+                "neofand: telemetry -> {} every {}s, retention {}d ({} electrical keys, \
+                 {} SMC temperature channels, {} hwmon channels)",
+                logging.db_path,
+                logging.interval.as_secs(),
+                logging.retention_days,
+                collector.power_key_count(),
+                collector.temp_count(),
+                hwmon.len(),
+            );
+            Some(Telemetry {
+                logger,
+                collector,
+                host: telemetry::HostLoad::default(),
+                hwmon,
+                interval: logging.interval,
+                last: None,
+            })
+        }
+        Err(e) => {
+            // Never fatal: fan control is the daemon's actual job.
+            eprintln!("neofand: telemetry disabled — {e}");
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "logging"))]
+fn telemetry_init(_logging: &config::LoggingConfig, _smc: Option<&smc::Smc>) -> TelemetrySink {}
+
+#[cfg(feature = "web")]
+fn web_init(web: &config::WebConfig, logging: &config::LoggingConfig) {
+    if !web.enabled {
+        return;
+    }
+    if !logging.enabled {
+        eprintln!("neofand: web enabled but logging is not — the dashboard would have no history");
+    }
+    match web::spawn(web, &logging.db_path) {
+        Ok(()) => eprintln!("neofand: dashboard on http://{}/", web.bind),
+        Err(e) => eprintln!("neofand: web disabled — {e}"),
+    }
+}
+
+#[cfg(not(feature = "web"))]
+fn web_init(_web: &config::WebConfig, _logging: &config::LoggingConfig) {}
+
+#[cfg(feature = "logging")]
+fn record_telemetry(
+    sink: &mut TelemetrySink,
+    smc: Option<&smc::Smc>,
+    fans: &NonEmptyVec<FanController>,
+    readings: &Readings,
+    cover_open: bool,
+    gpu_group: &TempGroup,
+) {
+    let Some(state) = sink.as_mut() else {
+        return;
+    };
+
+    let now = std::time::Instant::now();
+    if state
+        .last
+        .is_some_and(|last| now.duration_since(last) < state.interval)
+    {
+        return;
+    }
+    state.last = Some(now);
+
+    let mut out = Vec::with_capacity(512);
+
+    if let Some(smc) = smc {
+        state.collector.collect(smc, &mut out);
+    }
+    state.host.sample(&mut out);
+    state.hwmon.collect(&mut out);
+
+    for (i, fan) in fans.into_iter().enumerate() {
+        let number = i + 1;
+        // Target and actual are both recorded because they diverge by design on
+        // this hardware: `fan1_max` under-reports, so a fan asked for more than
+        // it reports as its ceiling is normal, not a fault.
+        out.push(telemetry::Reading::new(
+            "fan",
+            format!("fan{number}_target_rpm"),
+            "rpm",
+            f64::from(fan.calc_speed(readings, cover_open)),
+            telemetry::Kind::Rpm,
+        ));
+        if let Some(rpm) = fan.actual_rpm() {
+            out.push(telemetry::Reading::new(
+                "fan",
+                format!("fan{number}_rpm"),
+                "rpm",
+                f64::from(rpm),
+                telemetry::Kind::Rpm,
+            ));
+        }
+        // The ceiling is what makes RPM comparable across fans with different
+        // ranges, and comparable to the cards' percent-duty blowers. Static, so
+        // the deadband collapses it to one row.
+        out.push(telemetry::Reading::new(
+            "fan",
+            format!("fan{number}_max_rpm"),
+            "rpm",
+            f64::from(fan.max_speed()),
+            telemetry::Kind::Rpm,
+        ));
+    }
+
+    if let Some(nvidia) = gpu_group.nvidia() {
+        for card in nvidia.full_status() {
+            let index = card.index;
+            let mut push = |suffix: &str, unit, value: f64, kind| {
+                out.push(telemetry::Reading::new(
+                    "gpu",
+                    format!("gpu{index}_{suffix}"),
+                    unit,
+                    value,
+                    kind,
+                ));
+            };
+            if let Some(v) = card.power_w {
+                push("power_w", "W", f64::from(v), telemetry::Kind::Power);
+            }
+            if let Some(v) = card.temp_c {
+                push("temp_c", "C", f64::from(v), telemetry::Kind::Temp);
+            }
+            if let Some(v) = card.mem_temp_c {
+                push("mem_temp_c", "C", f64::from(v), telemetry::Kind::Temp);
+            }
+            if let Some(v) = card.fan_actual_pct {
+                push("fan_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+            if let Some(v) = card.mem_used_bytes {
+                push("mem_used_bytes", "B", v as f64, telemetry::Kind::Bytes);
+            }
+            if let Some(v) = card.mem_total_bytes {
+                push("mem_total_bytes", "B", v as f64, telemetry::Kind::Bytes);
+            }
+            if let Some(v) = card.util_gpu_pct {
+                push("util_gpu_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+            if let Some(v) = card.util_mem_pct {
+                push("util_mem_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+        }
+    }
+
+    state.logger.submit(telemetry::Sample {
+        unix_time: now_unix(),
+        readings: out,
+    });
+}
+
+#[cfg(not(feature = "logging"))]
+#[allow(clippy::needless_pass_by_ref_mut)]
+fn record_telemetry(
+    _sink: &mut TelemetrySink,
+    _smc: Option<&smc::Smc>,
+    _fans: &NonEmptyVec<FanController>,
+    _readings: &Readings,
+    _cover_open: bool,
+    _gpu_group: &TempGroup,
+) {
 }

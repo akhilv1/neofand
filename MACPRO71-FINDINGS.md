@@ -173,6 +173,93 @@ the cover:
 throttles all three GPUs. Any benchmark run with the cover off is not comparable
 to one run closed. Check `GTHR == 00` before trusting a result.
 
+**Quantified 2026-08-05 — it costs 20x.** Same boot, same model, same binary,
+cover the only variable (llama.cpp, qwen3.6-35B-A3B Q8_0, `-ngl 99`, layer split;
+weights confirmed VRAM-resident at 17.7 + 16.7 GiB in both):
+
+| cover | sclk under load | power | Tj | pp512 t/s | tg128 t/s |
+|---|---|---|---|---|---|
+| closed | 1730 MHz (DPM 8) | 89 W | 61 C | **987.6 ± 5.7** | 48.8 ± 3.7 |
+| open (`GTHR=07`) | 1000 MHz (DPM 1) | 39 W / 24 W | 48 C | **48.8 ± 0.3** | 6.4 ± 0.0 |
+
+Two things this settles:
+
+- **`mclk` is not throttled** — normal 1000 MHz (HBM2 full speed, `DPM disabled`
+  by design), so memory bandwidth is not the mechanism.
+- **Junction is 48 C**, so it is not thermal.
+
+### The mechanism is issue-rate gating, not just DVFS
+
+**Controlled experiment, 2026-08-05.** Same binary, same boot, cover the only
+variable. A pure-FMA kernel with no memory traffic, verified clean (VGPRs 18,
+ScratchSize 0, no spills, 8 waves/SIMD max occupancy). The kernel launches in
+~52 ms bursts with a sync between, which never triggers a DPM ramp — so the GPU
+sat at **DPM level 1 in both states**, holding clock and voltage constant for
+free. That makes this an unusually clean isolation:
+
+| cover | actual sclk (`freq1_input`) | vddgfx | mclk / fclk / socclk | power | achieved |
+|---|---|---|---|---|---|
+| open (`GTHR=07`) | 999 MHz | 731 mV | 1000 / 1166 / 971 | 38 W | **0.13 TFLOP/s** |
+| closed (`GTHR=00`) | 999 MHz | 731 mV | 1000 / 1166 / 971 | 63 W | **2.65 TFLOP/s** |
+
+**20.4x more delivered FLOPs with not one clock or voltage variable moved.** The
+throttle holds off wave issue; it does not scale frequency. Power rising 38 -> 63 W
+at constant frequency confirms it: more instructions issuing means more dynamic
+power. Cover-open sits ~15 W above the 23 W idle — far above the ~0.5 W of
+*power*-gated CUs, far below what executing CUs draw. The CUs stay clocked and
+powered while issue is gated.
+
+Reference points: 2.65 TFLOP/s is 32% of the 8.18 TFLOP/s peak implied by
+64 CU x 64 lanes x 2 flop x 0.999 GHz — a sane figure for an FMA burn with launch
+overhead, which validates the kernel and confirms the cover-open 1.6% was the
+throttle rather than a measurement flaw.
+
+**Consequence for tooling: neither `pp_dpm_sclk` nor `freq1_input` can detect
+this throttle.** Both read identical in the two states above. Achieved
+throughput, delivered FLOP/s, or `GTHR` itself are the only reliable detectors —
+which is why `bench.sh`'s DPM-level warning is a backstop, not a test.
+
+### Clearing `GTHR` does NOT restore the boost ceiling (cover-open damage persists)
+
+Refitting the cover clears `GTHR` — neofand logs `SMC GPU throttling cleared`,
+and the issue-gating does lift. **But the GPUs stay pinned at DPM level 1 /
+1000 MHz afterwards, and the driver cannot raise them:**
+
+- `power_dpm_force_performance_level=high` -> still DPM 1, 999 MHz.
+- `power_dpm_force_performance_level=manual` + `echo 8 > pp_dpm_sclk` -> still DPM 1.
+- `pp_dpm_sclk` still *advertises* all nine levels up to 1730 MHz; `amdgpu_pm_info`
+  reports `PSTATE_SCLK 999 MHz`. Power cap is untouched at 200 W and temps are
+  cold (Tj 40 C), so nothing legitimate is holding it down.
+
+The clamp is enforced SMU-side, below the driver. Measured on the same boot,
+llama.cpp qwen3.6-35B Q8_0 pp512:
+
+| state | pp512 | DPM | issue-gating |
+|---|---|---|---|
+| cover open | 48.84 | 1 (1000 MHz) | on |
+| cover refitted, `GTHR` cleared | **614.64** | 1 (1000 MHz) | off |
+| same boot, cover never opened | 987.61 | 8 (1730 MHz) | off |
+
+So the two effects separate cleanly: issue-gating is worth **12.6x** and the DPM
+ceiling **1.61x** (against the 1.73x the clock ratio predicts), for the 20.2x total.
+
+**Operational consequence: opening the cover costs ~1.6x for the rest of the
+boot, even after you close it.** A trustworthy benchmark requires a boot in
+which the cover was never opened. This is very likely what really happened on
+2026-08-04 — the 20x recovery from `qwen-q8-baseline` to
+`qwen-q8-postreboot-default` spans *both* a cover close and a reboot, and it now
+looks like both were needed.
+
+**Untested:** that a reboot is what clears it. Strongly implied by the 08-04
+sequence but not deliberately verified. Worth confirming, along with whether a
+cheaper reset (amdgpu module reload, suspend/resume) also works.
+
+Signature to recognise on this model: **~48.8 pp512 / ~6.4 tg128**. That
+signature retroactively invalidated the 2026-08-04 `qwen-q8-baseline` run
+(48.90 / 6.51 — matches to 0.1%), which had been recorded as a legitimate
+prereboot baseline and used to credit a reboot with a 20x gain that was actually
+just the case being closed. See `bench-results/IF-BRIDGE-REGRESSION-2026-08-05.md`.
+
 `F*Te` tracks `F*Tg`, so the cover override arrives via the `Te` control slot.
 
 ### `LS*` = LED Status (a trap — cost an hour)
@@ -331,9 +418,9 @@ Still open:
   check: set `cover_mode=release`, run a GPU load with the cover off, and see
   whether the T2 pushes past 2250. If it does ramp with temperature, `release`
   becomes competitive again and the floors should be re-derived from its curve.
-- **Verify `GTHR` actually caps clocks.** It correlates perfectly with cover
-  state and is named like a throttle, but a cover-on vs cover-off benchmark has
-  not been run to prove it bites.
+- ~~**Verify `GTHR` actually caps clocks.**~~ **Done 2026-08-05: it does, and it
+  costs 20x** (987.6 -> 48.8 pp512). Numbers and method in "The cover-open
+  response cluster" above. Note `pp_dpm_sclk` understates the throttle.
 - **Tune the PSU thresholds against a real load.** 250→900 W and 45→70 °C are
   first estimates from a 195 W idle and a 226 W CPU-only step; nothing has yet
   driven the PSU hard.
@@ -378,3 +465,80 @@ Corresponding SMC keys per fan `X` in 0..3: `FXAc` actual RPM, `FXTg` target,
 `FXMd` manual flag, `FXMn`/`FXMx` min/max, `FXTa`..`FXTe` appear to be requested
 targets from five independent control sources (the max seems to win into `Tg`),
 `FNum` = 4 fan count.
+
+## SMC power zones — the GPU brake explained (2026-08-09)
+
+The `P*` key space is a **power-zone tree**, and it is what actually drives the
+`HW-POWER-BRAKE` seen on the A6000s. Each zone has a gauge, a filtered average,
+a ceiling and a trip flag: `PZ<n>G` / `PZ<n>F` / `PZ<n>E` / `PZ<n>T`.
+
+| zone | alias | ceiling | idle | 3-card burn | what |
+|---|---|---|---|---|---|
+| `PZ1` | `PC0H` | 450 W | 85.0 | 115.5 | CPU |
+| `PZ3` | `PG0R` | **375 W** | 45.7 | **387.1 — over, `PZ3T`=100** | GPU rail 0 |
+| `PZ4` | `PG2R` | 375 W | 19.2 | 352.9 | GPU rail 1 |
+| `PZ5` | `PD2R` | 300 W | 25.8 | 179.3 | unidentified |
+| `PZ0`/`PZ6` | — | 1228 W | 204.7 | 1052 | total 12 V DC out |
+| `PZ7` | — | 1562 W | 234.3 | 1083 | 12 V DC, ~30 W above `PZ0` |
+
+`PSTR` = `PDTR` = total system power: 207.8 W idle, 1066 W under a 3-card burn.
+
+**Sensing is platform-side, not on the card.** Apple meters each rail; the
+signal reaches a stock PC card through the PCIe CEM `PWRBRK#` pin (B30), a
+platform→card slot signal. That is why an A6000 with no Apple awareness responds
+at all, and why *slot position* — not the card — decides which one brakes.
+
+### `GTHR` is announced, not enforced
+
+Measured solo vs trio, 90 s each, identical TF32 SGEMM:
+
+| card | solo | in trio | delta |
+|---|---|---|---|
+| GPU0 `0D` | 5680 gemms | 5680 | **0.00%** |
+| GPU1 `0F` | 5736 | 5672 | −1.12% |
+| GPU2 `FC` | 5744 | 5648 | −1.67% |
+
+`GTHR` was asserted **47/84 samples in the trio run and 0/84 in every solo run**,
+and aggregate throughput fell 0.93% (209.7 → 207.7 TF). So `GTHR`/`PZ*T` mean
+"a zone is over budget", not "the cards are being held back". **Do not infer a
+performance loss from `GTHR`** — count GEMMs.
+
+### Two decoding traps
+
+- **`P*` keys are not uniformly `flt`.** `PC0P`, `PMLt` and `Pf*` are `spc3`;
+  `PM0f` is `sp5a`. The type code encodes its own layout (`spNM` = signed, `M`
+  hex fractional bits), so decode generically. Reading `spc3` as `flt` is
+  garbage. Also note `flt` is little-endian while every integer and fixed-point
+  type is big-endian.
+- **`PZ0/PZ7` is not PSU efficiency.** It looks like 87% idle rising to 97% under
+  load, which is already above what any AC→DC supply achieves. Both keys divide
+  to **11.975 V** against the SMC current keys (`PSTR/IDTR`, `PZ7G/IDTA`), so
+  both are 12 V DC-side, and the gap is a near-constant ~30 W rather than a
+  load-proportional loss. `VAIR` gives mains voltage (121 V) but there is no AC
+  current key, so true efficiency needs an external wall meter against `PSTR`.
+
+### Headroom for a 4th A6000
+
+The two GPU zones total 750 W of budget; three cards already draw 740 W. A 4th
+needs ~247 W and ~10 W is free. It fits only with all four capped to ~185–190 W
+— worth it for VRAM (192 GB), roughly a wash for compute. Note an A6000 in an
+MPX bay **cannot draw from the MPX connector**; it still feeds from the aux
+cables, so an MPX slot buys a slot, not a power feed.
+
+## Telemetry and the web UI (2026-08-09)
+
+`[Logging]` and `[Web]` are optional features (`cargo build --features web`).
+386 channels at 10 s with a deadband; **discrete channels — `GTHR`, `MSCO`,
+`PZ*T` — use a zero deadband so a trip shorter than the sample interval is still
+recorded.**
+
+The logger lives in this daemon rather than a separate collector for the reason
+in "SMC access": `key_at_index` is one shared index register, so an external
+process cannot read raw keys while neofand runs. That is precisely why the `P*`
+zones were unreachable until now.
+
+Control endpoints are authorised by **Tailscale identity** (`tsauth.rs`), which
+means no shared secret. This makes the bind address load-bearing: address-derived
+identity is only sound if the packet came through the tunnel, so `web.rs`
+disables control on a wildcard bind. Boot selection sets `BootNext` only — a
+one-shot the firmware clears — never `BootOrder`.
