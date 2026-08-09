@@ -535,7 +535,7 @@ fn start_temp_loop(
         {
             last = Some(readings);
             for fan in fans {
-                fan.set_speed(fan.calc_speed(&readings, cover_open))?;
+                fan.set_speed(fan.commanded_speed(&readings, cover_open))?;
             }
         }
 
@@ -1034,6 +1034,15 @@ fn record_telemetry(
             f64::from(fan.calc_speed(readings, cover_open)),
             telemetry::Kind::Rpm,
         ));
+        if let Some(rpm) = fan.last_commanded_rpm() {
+            out.push(telemetry::Reading::new(
+                "fan",
+                format!("fan{number}_commanded_rpm"),
+                "rpm",
+                f64::from(rpm),
+                telemetry::Kind::Rpm,
+            ));
+        }
         if let Some(rpm) = fan.actual_rpm() {
             out.push(telemetry::Reading::new(
                 "fan",

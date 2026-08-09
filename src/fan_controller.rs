@@ -37,7 +37,39 @@ pub struct FanController {
     max_speed: u32,
     /// Floor enforced while the cover is off. See `FanConfig::cover_open_rpm`.
     cover_open_speed: u32,
+
+    /// Last speed actually commanded, for hysteresis.
+    ///
+    /// `Cell` because the control loop holds the fans immutably and this is the
+    /// only mutable state they need. Sound here because the loop is
+    /// single-threaded by design (see `smc.rs`) and `FanController` is never
+    /// shared across threads.
+    last_commanded: std::cell::Cell<Option<u32>>,
 }
+
+/// Minimum change before the commanded speed moves at all.
+///
+/// Kills chatter, but on its own it cannot damp a large oscillation -- see
+/// `SLEW_*` below.
+const HYSTERESIS_RPM: u32 = 80;
+
+/// Maximum change per poll, rising and falling.
+///
+/// This is what actually fixes oscillation, and it is asymmetric on purpose.
+///
+/// Measured on MacPro7,1: GPU temperature wobbles ~1 C between polls under a
+/// bursty inference load, and with the logarithmic curve (`cbrt`, which is
+/// near-vertical at the bottom of the ramp) that 1 C moved the target ~465 RPM,
+/// reversing direction on 91% of samples. A deadband alone does not help --
+/// each swing is far larger than any sane deadband. Rate-limiting does: a
+/// signal that flips every poll can never traverse the full swing, so the fan
+/// settles near the mean instead of chasing the noise.
+///
+/// Rising is allowed to move faster than falling because the failure modes are
+/// not symmetric: being slow to speed up risks the hardware, being slow to slow
+/// down only costs noise.
+const SLEW_UP_RPM: u32 = 150;
+const SLEW_DOWN_RPM: u32 = 60;
 
 /// Fraction of the way from `low` to `high`, clamped to 0.0..=1.0.
 fn demand(temp: u8, low: u8, high: u8) -> f32 {
@@ -176,6 +208,7 @@ impl FanController {
             base_path: path,
             min_speed,
             max_speed,
+            last_commanded: std::cell::Cell::new(None),
             cover_open_speed,
         };
 
@@ -366,5 +399,111 @@ impl FanController {
 
         let curved = self.min_speed + (shaped * (self.max_speed - self.min_speed) as f32) as u32;
         curved.max(floor)
+    }
+
+    /// The last speed this controller commanded, without advancing anything.
+    ///
+    /// Read-only on purpose: `commanded_speed` is a state machine that steps
+    /// once per control tick, so telemetry and the status snapshot must observe
+    /// it rather than call it. Calling it from the 10 s telemetry path as well
+    /// as the 1 s control path would step the slew limiter twice per cycle and
+    /// silently double the ramp rate.
+    pub fn last_commanded_rpm(&self) -> Option<u32> {
+        self.last_commanded.get()
+    }
+
+    /// The speed to actually write, after hysteresis and slew limiting.
+    ///
+    /// `calc_speed` stays pure so the raw curve target can be published
+    /// alongside what was really commanded -- seeing both is how you tell a fan
+    /// that is being damped from one that cannot reach its target.
+    ///
+    /// Safety floors bypass damping entirely: with the cover off there is no
+    /// chassis static pressure, and ramping gently towards the floor is not a
+    /// tradeoff worth making.
+    pub fn commanded_speed(&self, readings: &Readings, cover_open: bool) -> u32 {
+        let target = self.calc_speed(readings, cover_open);
+        let floor = if cover_open {
+            self.cover_open_speed
+        } else {
+            self.min_speed
+        };
+
+        let Some(last) = self.last_commanded.get() else {
+            // First poll has nothing to smooth against; take the target as-is
+            // rather than ramping up from zero.
+            self.last_commanded.set(Some(target));
+            return target;
+        };
+
+        let next = damp(last, target, floor, self.max_speed);
+        self.last_commanded.set(Some(next));
+        next
+    }
+}
+
+/// One step of the damping state machine.
+///
+/// Free function so it can be tested without a real fan behind it.
+fn damp(last: u32, target: u32, floor: u32, ceiling: u32) -> u32 {
+    let next = if target > last {
+        if target - last < HYSTERESIS_RPM {
+            last
+        } else {
+            last + (target - last).min(SLEW_UP_RPM)
+        }
+    } else if target < last {
+        if last - target < HYSTERESIS_RPM {
+            last
+        } else {
+            last - (last - target).min(SLEW_DOWN_RPM)
+        }
+    } else {
+        last
+    };
+
+    // A floor is a safety limit, not a preference: never damp below it.
+    next.clamp(floor, ceiling)
+}
+
+#[cfg(test)]
+mod damp_tests {
+    use super::{damp, HYSTERESIS_RPM, SLEW_DOWN_RPM, SLEW_UP_RPM};
+
+    #[test]
+    fn small_moves_are_ignored() {
+        // The chatter this exists to kill.
+        assert_eq!(damp(900, 900 + HYSTERESIS_RPM - 1, 500, 2500), 900);
+        assert_eq!(damp(900, 900 - HYSTERESIS_RPM + 1, 500, 2500), 900);
+    }
+
+    #[test]
+    fn large_moves_are_rate_limited_and_asymmetric() {
+        // Rising is allowed to move faster than falling: being slow to speed up
+        // risks the hardware, being slow to slow down only costs noise.
+        assert_eq!(damp(500, 2500, 500, 2500), 500 + SLEW_UP_RPM);
+        assert_eq!(damp(2500, 500, 500, 2500), 2500 - SLEW_DOWN_RPM);
+        assert!(SLEW_UP_RPM > SLEW_DOWN_RPM);
+    }
+
+    #[test]
+    fn a_floor_is_never_damped_through() {
+        // Cover opens: the floor jumps to 1350 and must apply at once, not
+        // ramp towards it 60 RPM at a time.
+        assert_eq!(damp(500, 1350, 1350, 2500), 1350);
+    }
+
+    #[test]
+    fn oscillation_settles_instead_of_chasing() {
+        // The measured failure: target flips 500 <-> 965 every poll. Undamped
+        // that is a 465 RPM swing each tick; damped it must converge.
+        let mut rpm = 500;
+        for i in 0..40 {
+            rpm = damp(rpm, if i % 2 == 0 { 965 } else { 500 }, 500, 2500);
+        }
+        let swing_after = damp(rpm, 965, 500, 2500).abs_diff(damp(rpm, 500, 500, 2500));
+        assert!(swing_after <= SLEW_UP_RPM + SLEW_DOWN_RPM,
+                "per-tick swing {swing_after} should be bounded by the slew limits");
+        assert!(rpm > 500 && rpm < 965, "should settle between the extremes, got {rpm}");
     }
 }
