@@ -21,6 +21,7 @@ use std::{
     path::PathBuf,
     process::ExitCode,
     sync::{atomic::AtomicBool, Arc},
+    time::{Duration, Instant},
 };
 
 use arraydeque::ArrayDeque;
@@ -28,7 +29,7 @@ use fan_controller::{FanController, Readings};
 use nonempty::NonEmpty as NonEmptyVec;
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use config::{load_config, CoverMode, GpuFanConfig, MAX_FALL_SAMPLES};
+use config::{load_config, CoverMode, FanSource, GpuFanConfig, MAX_FALL_SAMPLES};
 use error::{Error, Result};
 
 mod config;
@@ -171,10 +172,19 @@ impl TempGroup {
             };
 
             // Only keep sensors that actually parse, so a bogus node cannot
-            // take the daemon down mid-loop.
+            // take the daemon down mid-loop. Say so when one is dropped: a
+            // silent skip here is indistinguishable from the sensor never being
+            // discovered, which sends you looking at the config instead of the
+            // hardware.
             if read_temp_file(&mut file, temp_buf).is_ok() {
                 println!("neofand: {label} sensor {desc}");
                 files.push((desc, file));
+            } else {
+                eprintln!(
+                    "neofand: WARNING ignoring {label} sensor {desc} — {} did not parse as a \
+                     temperature",
+                    path.display()
+                );
             }
         }
 
@@ -286,6 +296,62 @@ fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs())
+}
+
+/// Discover GPU temperature channels, re-scanning until the set stops growing.
+///
+/// A GPU driver publishes its hwmon node at the end of its probe, which can land
+/// after this daemon has already started — measured 9.1 s late for amdgpu on a
+/// MacPro7,1. A single scan at startup therefore silently misses the card for the
+/// lifetime of the process.
+///
+/// Cards cannot be swapped on a running machine, so this settles once and then
+/// stops rather than polling forever. It returns as soon as two consecutive scans
+/// agree, so the common case where everything is already bound costs one extra
+/// second rather than the whole window.
+fn settle_gpu_sensors(config: &config::GpuConfig) -> Result<Vec<gpu::Sensor>> {
+    const AGREEING_SCANS: u32 = 2;
+
+    let mut best = gpu::discover(config)?;
+    if config.settle_secs == 0 {
+        return Ok(best);
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(config.settle_secs);
+    let mut stable = 0;
+
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_secs(1));
+        let scan = gpu::discover(config)?;
+
+        if scan.len() == best.len() {
+            stable += 1;
+            if stable >= AGREEING_SCANS {
+                break;
+            }
+            continue;
+        }
+
+        // Only ever grow the set. A channel that disappears mid-settle is a
+        // driver still rearranging itself, not a card being removed, so keeping
+        // the larger set avoids latching onto a transient.
+        if scan.len() > best.len() {
+            for sensor in &scan {
+                if !best.iter().any(|existing| existing.path == sensor.path) {
+                    println!(
+                        "neofand: gpu appeared {:.1}s after start: {}",
+                        config.settle_secs as f64
+                            - (deadline - Instant::now()).as_secs_f64(),
+                        sensor.desc
+                    );
+                }
+            }
+            best = scan;
+        }
+        stable = 0;
+    }
+
+    Ok(best)
 }
 
 fn main() -> ExitCode {
@@ -626,9 +692,51 @@ fn real_main() -> Result<()> {
         );
     }
 
-    // Captured before `config.fans` is consumed below.
-    let highest_gpu_high = config
-        .fans
+    // GPU discovery has to finish before the fans are built, because a fan's GPU
+    // thresholds may be derived from what the cards themselves report.
+    let gpu_sensors = settle_gpu_sensors(&config.gpu)?;
+    let gpu_limit = gpu::min_limit(&gpu_sensors);
+
+    // Auto-derive each fan's GPU ramp from the hardware, where the config asked
+    // for it by leaving both thresholds at 0. Done per fan rather than globally
+    // so a fan with explicit numbers keeps them.
+    let derived = config::GpuFanConfig::derive_chassis_ramp(gpu_limit);
+    let mut config_fans = config.fans;
+    for fan in &mut config_fans {
+        if fan.gpu_low_temp != 0 || fan.gpu_high_temp != 0 {
+            continue;
+        }
+        match derived {
+            Some((low, high)) => {
+                fan.gpu_low_temp = low;
+                fan.gpu_high_temp = high;
+            }
+            None => {
+                // Nothing published a limit, so there is nothing to derive from.
+                // Fall back to the documented pair rather than leaving 0/0, which
+                // would make the ramp demand 0 forever.
+                fan.gpu_low_temp = config::FALLBACK_LOW;
+                fan.gpu_high_temp = config::FALLBACK_HIGH;
+                eprintln!(
+                    "neofand: WARNING gpu thresholds set to auto but no GPU published a limit \
+                     — falling back to {}-{} C",
+                    config::FALLBACK_LOW,
+                    config::FALLBACK_HIGH
+                );
+            }
+        }
+    }
+    if config_fans.iter().any(|f| f.source == FanSource::Gpu) {
+        if let (Some(limit), Some((low, high))) = (gpu_limit, derived) {
+            println!(
+                "neofand: gpu chassis ramp {low}-{high} C auto-derived from the coolest \
+                 throttle point present ({limit} C)"
+            );
+        }
+    }
+
+    // Captured before `config_fans` is consumed below.
+    let highest_gpu_high = config_fans
         .iter()
         .map(|f| f.gpu_high_temp)
         .max()
@@ -636,12 +744,12 @@ fn real_main() -> Result<()> {
 
     let fans = fan_paths
         .into_iter()
-        .zip(config.fans)
+        .zip(config_fans)
         .map(|(path, fan_config)| FanController::new(path, fan_config))
         .collect::<Result<Vec<_>>>()?;
     let fans = NonEmptyVec::from_vec(fans).ok_or(Error::NoFan)?;
 
-    let gpu_sensors = gpu::discover(&config.gpu)?
+    let gpu_sensors = gpu_sensors
         .into_iter()
         .map(|s| (s.path, s.desc))
         .collect::<Vec<_>>();

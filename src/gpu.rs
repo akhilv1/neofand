@@ -26,6 +26,12 @@ use crate::{
 pub struct Sensor {
     pub path: PathBuf,
     pub desc: String,
+    /// The card's own throttle/shutdown point for this channel, in whole degrees.
+    ///
+    /// Read from the hardware rather than assumed, so a fan ramp can be derived
+    /// per card instead of from a profile constant keyed to whatever GPU
+    /// happened to be installed when the profile was written.
+    pub limit_c: Option<u32>,
 }
 
 /// Labels that identify each kind of channel, lowercased substring match.
@@ -39,6 +45,34 @@ fn label_of(input_path: &PathBuf) -> Option<String> {
     let label_path = input_path.with_file_name(format!("{stem}_label"));
     let raw = std::fs::read_to_string(label_path).ok()?;
     Some(raw.trim().to_lowercase())
+}
+
+/// The throttle point hwmon advertises for one channel, in whole degrees.
+///
+/// `crit` is the standard hwmon name and what amdgpu uses; `emergency` and `max`
+/// are tried after it so a driver that only publishes one of those still yields
+/// a limit rather than falling back to a hardcoded guess.
+fn limit_of(input_path: &PathBuf) -> Option<u32> {
+    let name = input_path.file_name()?.to_str()?;
+    let stem = name.strip_suffix("_input")?;
+
+    for suffix in ["crit", "emergency", "max"] {
+        let candidate = input_path.with_file_name(format!("{stem}_{suffix}"));
+        let Ok(raw) = std::fs::read_to_string(candidate) else {
+            continue;
+        };
+        let Ok(millidegrees) = raw.trim().parse::<i64>() else {
+            continue;
+        };
+        // Drivers publish an unset threshold as a large negative sentinel
+        // (temp1_crit_hyst reads -273150 on this hardware), so reject anything
+        // that is not a plausible silicon limit rather than deriving from it.
+        if millidegrees > 30_000 && millidegrees < 200_000 {
+            return u32::try_from(millidegrees / 1000).ok();
+        }
+    }
+
+    None
 }
 
 fn matches(label: Option<&String>, hints: &[&str]) -> bool {
@@ -103,6 +137,7 @@ fn select(hwmon: &PathBuf, driver: &str, preference: SensorPreference) -> Vec<Se
         return labelled
             .iter()
             .map(|(path, label)| Sensor {
+                limit_c: limit_of(path),
                 path: path.clone(),
                 desc: describe(path, label.as_ref()),
             })
@@ -125,6 +160,7 @@ fn select(hwmon: &PathBuf, driver: &str, preference: SensorPreference) -> Vec<Se
             .find(|(_, label)| matches(label.as_ref(), hint_set))
         {
             return vec![Sensor {
+                limit_c: limit_of(path),
                 path: path.clone(),
                 desc: describe(path, label.as_ref()),
             }];
@@ -135,6 +171,7 @@ fn select(hwmon: &PathBuf, driver: &str, preference: SensorPreference) -> Vec<Se
     // nouveau / i915 case, where a bare temp1_input is the GPU temperature.
     let (path, label) = &labelled[0];
     vec![Sensor {
+        limit_c: limit_of(path),
         path: path.clone(),
         desc: format!("{} [unlabelled fallback]", describe(path, label.as_ref())),
     }]
@@ -172,9 +209,85 @@ pub fn discover(config: &GpuConfig) -> Result<Vec<Sensor>> {
     for pattern in &config.extra_temp_paths {
         for path in glob::glob(pattern)?.filter_map(std::result::Result::ok) {
             let desc = format!("extra:{}", path.display());
-            sensors.push(Sensor { path, desc });
+            let limit_c = limit_of(&path);
+            sensors.push(Sensor {
+                path,
+                desc,
+                limit_c,
+            });
         }
     }
 
     Ok(sensors)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a fake hwmon channel in a temp dir and read its limit back.
+    ///
+    /// `case` must be unique per test: these run in parallel in one process, and
+    /// a shared directory means one test deletes another's fixture mid-read.
+    fn limit_from(case: &str, files: &[(&str, &str)]) -> Option<u32> {
+        let dir = std::env::temp_dir()
+            .join(format!("neofand-gpu-test-{}-{case}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        for (name, contents) in files {
+            std::fs::write(dir.join(name), contents).expect("write");
+        }
+        let limit = limit_of(&dir.join("temp1_input"));
+        std::fs::remove_dir_all(&dir).ok();
+        limit
+    }
+
+    #[test]
+    fn reads_crit_in_whole_degrees() {
+        // What the RX 460 actually publishes.
+        assert_eq!(
+            limit_from("crit", &[("temp1_input", "34000\n"), ("temp1_crit", "94000\n")]),
+            Some(94)
+        );
+    }
+
+    #[test]
+    fn rejects_the_unset_sentinel() {
+        // temp1_crit_hyst reads -273150 on this hardware. Deriving a fan ramp
+        // from absolute zero would peg the fans forever, so an implausible
+        // value must be refused rather than clamped.
+        assert_eq!(
+            limit_from("sentinel", &[("temp1_input", "34000\n"), ("temp1_crit", "-273150\n")]),
+            None
+        );
+    }
+
+    #[test]
+    fn falls_through_crit_to_emergency() {
+        // A driver that only publishes one of the three still yields a limit.
+        assert_eq!(
+            limit_from(
+                "emergency",
+                &[
+                ("temp1_input", "34000\n"),
+                ("temp1_crit", "-273150\n"),
+                ("temp1_emergency", "100000\n"),
+                ]
+            ),
+            Some(100)
+        );
+    }
+
+    #[test]
+    fn no_limit_files_is_not_an_error() {
+        assert_eq!(limit_from("bare", &[("temp1_input", "34000\n")]), None);
+    }
+}
+
+/// The coolest throttle point across a discovered set, in whole degrees.
+///
+/// The chassis fans are driven from one reduced temperature rather than per card,
+/// so the ramp has to suit the card that throttles earliest — anything hotter
+/// would let that card start clocking down before the fans reached maximum.
+pub fn min_limit(sensors: &[Sensor]) -> Option<u32> {
+    sensors.iter().filter_map(|s| s.limit_c).min()
 }

@@ -325,6 +325,18 @@ pub struct GpuConfig {
     /// the only way to see them; harmless to leave on with no NVIDIA driver
     /// present, since the library is loaded at runtime.
     pub use_nvml: bool,
+    /// How long to keep re-scanning for GPUs after startup, in seconds.
+    ///
+    /// A GPU driver registers its hwmon node at the end of its probe, which can
+    /// land well after this daemon starts: measured 9.1 s late for amdgpu on a
+    /// MacPro7,1 (VBIOS fetch from VFCT, then display-core init, then hwmon).
+    /// Scanning once at startup therefore misses the card permanently and looks
+    /// exactly like a misconfiguration. Re-scanning for a window costs one
+    /// directory walk per second and then stops.
+    ///
+    /// Cards cannot be changed while the machine runs, so this is a startup
+    /// settle window rather than continuous polling. 0 disables it.
+    pub settle_secs: u64,
 }
 
 impl Default for GpuConfig {
@@ -337,6 +349,7 @@ impl Default for GpuConfig {
             sensor_preference: SensorPreference::Junction,
             extra_temp_paths: Vec::new(),
             use_nvml: true,
+            settle_secs: 30,
         }
     }
 }
@@ -446,6 +459,32 @@ impl GpuFanConfig {
     /// Auto-derivation is per-card on purpose: thresholds vary by model, so a
     /// box with mixed GPUs needs a different curve for each rather than one
     /// tuned to whichever card happened to be measured.
+    /// Derive a chassis-fan GPU ramp from the hardware's own throttle point.
+    ///
+    /// Same margins as [`GpuFanConfig::resolve_ramp`] so a card's own blower and
+    /// the chassis fans that feed it agree on when things are getting hot. Kept
+    /// separate because the chassis fans take a single reduced temperature for
+    /// every GPU at once, so the caller passes the *coolest* limit present.
+    ///
+    /// Returns `None` when nothing published a usable limit, leaving the caller's
+    /// configured thresholds in place rather than inventing a ramp.
+    pub fn derive_chassis_ramp(limit: Option<u32>) -> Option<(u8, u8)> {
+        let limit = u8::try_from(limit?).ok()?;
+
+        // The full ramp has to fit below the limit without either end
+        // saturating. Checking `high > low` afterwards is not enough: a 20 C
+        // limit yields high=5, low=0, which passes that test while describing a
+        // ramp that is finished before any real GPU has warmed up. Anything this
+        // cool is a bogus or misread threshold, not silicon.
+        if limit <= AUTO_HIGH_MARGIN + AUTO_RAMP_WIDTH {
+            return None;
+        }
+
+        let high = limit - AUTO_HIGH_MARGIN;
+        let low = high - AUTO_RAMP_WIDTH;
+        Some((low, high))
+    }
+
     pub fn resolve_ramp(&self, slowdown: Option<u32>) -> (u8, u8) {
         // An explicit pair in the config always wins; auto only fills in what
         // was left at 0.
@@ -570,6 +609,7 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         ),
         extra_temp_paths: get_list(gpu_section, "extra_temp_paths", Vec::new()),
         use_nvml: get_or(gpu_section, "use_nvml", gpu_defaults.use_nvml),
+        settle_secs: get_or(gpu_section, "settle_secs", gpu_defaults.settle_secs),
     };
 
     // Profile supplies the baseline; per-fan keys override individual fields.
@@ -637,7 +677,8 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
         .set("drivers", gpu.drivers.join(","))
         .set("sensor_preference", gpu.sensor_preference.to_string())
         .set("extra_temp_paths", gpu.extra_temp_paths.join(","))
-        .set("use_nvml", gpu.use_nvml.to_string());
+        .set("use_nvml", gpu.use_nvml.to_string())
+        .set("settle_secs", gpu.settle_secs.to_string());
 
     // Written out disabled, with the thresholds visible, so the keys are
     // discoverable without reaching for the README.
@@ -695,6 +736,33 @@ mod tests {
         // The A6000s report 95 C, which is what these constants were chosen
         // against: a 55-80 C ramp finishes well before the card clocks down.
         assert_eq!(cfg(0, 0).resolve_ramp(Some(95)), (55, 80));
+    }
+
+    #[test]
+    fn chassis_ramp_tracks_the_coolest_card() {
+        // The RX 460 publishes temp1_crit=94 C and the A6000s report a 95 C
+        // slowdown, so a box holding both must ramp for the 94 C card.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(94)), Some((54, 79)));
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(95)), Some((55, 80)));
+    }
+
+    #[test]
+    fn chassis_ramp_declines_rather_than_inventing_one() {
+        // No limit published means the caller keeps its configured thresholds.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(None), None);
+        // A limit so low the ramp would invert is refused, not clamped into a
+        // pair that makes the fan demand 0 forever.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(20)), None);
+    }
+
+    #[test]
+    fn chassis_and_card_ramps_agree_on_the_same_limit() {
+        // The card's own blower and the chassis fans feeding it should not
+        // disagree about when the card is getting hot.
+        assert_eq!(
+            GpuFanConfig::derive_chassis_ramp(Some(95)),
+            Some(cfg(0, 0).resolve_ramp(Some(95)))
+        );
     }
 
     #[test]
