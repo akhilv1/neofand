@@ -301,7 +301,7 @@
     main { padding: 12px; }
   }
 </style>
-<link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-4">
+<link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-6">
 </head>
 <body>
 
@@ -469,50 +469,44 @@
 
     <!-- Sensors -->
     <div id="tab-sensors" class="grid" hidden>
-      <section class="card wide sensor-diagram" aria-labelledby="diagram-title">
+      <section class="card wide sensor-diagram" aria-labelledby="diagram-gpu-title">
         <div class="body">
           <div class="diagram-head">
-            <div><h2 id="diagram-title">Inside the Mac Pro</h2><p>Temperatures, GPU blowers and chassis cooling at a glance.</p></div>
-            <div class="diagram-controls">
-              <span class="diagram-live" id="diagram-freshness" role="status">Connecting</span>
-              <div class="diagram-switch" role="group" aria-label="Chassis view">
-                <button type="button" data-diagram-side="gpu" aria-pressed="true">GPU side</button>
-                <button type="button" data-diagram-side="cooling" aria-pressed="false">Cooling side</button>
-              </div>
-            </div>
+            <div><h2 id="diagram-gpu-title">GPU &amp; CPU side</h2><p>Three RTX A6000s, processor temperature and front intake cooling.</p></div>
+            <span class="diagram-live" role="status">Connecting</span>
           </div>
-          <div class="diagram-frame" id="sensor-diagram-frame" data-side="gpu">
-            <img class="diagram-photo" id="sensor-diagram-photo" src="/hardware/assets/macpro-gpu-approved.png" alt="Mac Pro interior with three spaced RTX A6000 cards and hidden mounting tabs">
+          <div class="diagram-frame" id="sensor-diagram-frame">
+            <img class="diagram-photo" src="/hardware/assets/macpro-gpu-approved.png" alt="GPU side of the Mac Pro with three spaced RTX A6000 cards and hidden mounting tabs">
             <svg class="diagram-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <g class="gpu-only">
-                <path d="M57 50 H70 L76 42"/><circle cx="57" cy="50" r=".5"/>
-                <path d="M57 61.5 H70 L76 63"/><circle cx="57" cy="61.5" r=".5"/>
-                <path d="M57 73 H70 L76 84"/><circle cx="57" cy="73" r=".5"/>
-                <path d="M57 87 H29 L24 84"/><circle cx="57" cy="87" r=".5"/>
-              </g>
+              <path d="M57 50 H70 L76 33"/><circle cx="57" cy="50" r=".5"/>
+              <path d="M57 61.5 H70 L76 58"/><circle cx="57" cy="61.5" r=".5"/>
+              <path d="M57 73 H70 L76 83"/><circle cx="57" cy="73" r=".5"/>
               <path d="M43 29 H30 L24 21"/><circle cx="43" cy="29" r=".5"/>
               <path class="far-side" d="M33 52 L29 55 H24 M33 72 H29 V55"/><circle cx="33" cy="52" r=".5"/><circle cx="33" cy="72" r=".5"/>
-              <g class="cooling-only"><path d="M42 73 H70 L76 74"/><circle cx="42" cy="73" r=".5"/></g>
             </svg>
-            <div class="diagram-callout right gpu-top gpu-only">
+            <div class="diagram-callout right gpu-top">
               <span class="map-title">GPU 2 · RTX A6000</span>
               <strong class="map-main" data-diagram-sensor="gpu/gpu2_temp_c" data-unit="°C">—</strong>
               <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu2_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu2_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu2_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu2_util_gpu_pct" max="100" value="0" aria-label="GPU 2 utilization"></progress>
             </div>
-            <div class="diagram-callout right gpu-middle gpu-only">
+            <div class="diagram-callout right gpu-middle">
               <span class="map-title">GPU 0 · RTX A6000</span>
               <strong class="map-main" data-diagram-sensor="gpu/gpu0_temp_c" data-unit="°C">—</strong>
               <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu0_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu0_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu0_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu0_util_gpu_pct" max="100" value="0" aria-label="GPU 0 utilization"></progress>
             </div>
-            <div class="diagram-callout right gpu-bottom gpu-only">
+            <div class="diagram-callout right gpu-bottom">
               <span class="map-title">GPU 1 · RTX A6000</span>
               <strong class="map-main" data-diagram-sensor="gpu/gpu1_temp_c" data-unit="°C">—</strong>
               <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu1_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu1_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu1_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu1_util_gpu_pct" max="100" value="0" aria-label="GPU 1 utilization"></progress>
             </div>
             <div class="diagram-callout left cpu">
               <span class="map-title">CPU package</span>
               <strong class="map-main" data-diagram-sensor="hwmon/coretemp_package_id_0" data-unit="°C">—</strong>
               <span class="map-sub"><span>CPU fan 4</span><b data-diagram-sensor="fan/fan4_rpm" data-unit="RPM">—</b></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="host/cpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="host/cpu_pct" max="100" value="0" aria-label="CPU utilization"></progress>
             </div>
             <div class="diagram-callout left intake">
               <span class="map-title">GPU bay intake</span>
@@ -520,29 +514,48 @@
               <span class="map-sub"><span>Fan 3</span><b data-diagram-sensor="fan/fan3_rpm" data-unit="RPM">—</b></span>
               <span class="map-detail">Shared GPU cooling zone</span>
             </div>
-            <div class="diagram-callout left psu">
-              <span class="map-title">Power supply</span>
-              <strong class="map-main" id="diagram-psu-temp">—</strong>
-              <span class="map-sub"><span>PSU fan 1</span><b data-diagram-sensor="fan/fan1_rpm" data-unit="RPM">—</b></span>
-              <span class="map-detail">Hottest of the three PSU probes</span>
+            <div class="diagram-callout left psu-summary">
+              <span class="map-title">Power supply · total load</span>
+              <strong class="map-main" data-diagram-sensor="smc_power/PSTR" data-unit="W">—</strong>
+              <span class="map-sub"><span>Hottest PSU probe</span><b data-psu-temperature>—</b></span>
             </div>
           </div>
           <div class="diagram-foot"><span><strong>Live telemetry</strong> · follows the dashboard’s 30 second refresh</span><span>Positions are approximate · fans 2 and 3 share the GPU bay</span></div>
         </div>
       </section>
-      <section class="card wide" data-chart="custom">
-        <h2>Sensor readings<span class="tail"><button data-view="custom">Table</button></span></h2>
+      <section class="card wide sensor-diagram" aria-labelledby="diagram-reverse-title">
         <div class="body">
-          <div class="sub">Every logged channel. Select up to eight to plot.</div>
-          <div class="row" style="margin-bottom:9px">
-            <select id="subsystem"></select>
-            <span class="dim" id="chcount"></span>
+          <div class="diagram-head">
+            <div><h2 id="diagram-reverse-title">Memory &amp; PSU side</h2><p>System memory usage, pressure and power-supply cooling.</p></div>
+            <span class="diagram-live" role="status">Connecting</span>
           </div>
-          <div id="picker"></div>
-          <div class="empty" id="customhint">Select one or more channels above to plot them.</div>
-          <div class="plot" style="margin-top:12px"><canvas id="c-custom"></canvas><div class="tip" id="t-custom"></div></div>
-          <div class="legend" id="l-custom"></div>
-          <div class="tw" id="d-custom" hidden></div>
+          <div class="diagram-frame" id="sensor-diagram-reverse">
+            <img class="diagram-photo" src="/hardware/assets/macpro-fan-side.png" alt="Reverse side of the Mac Pro with memory banks and the PSU blower">
+            <svg class="diagram-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M60 25 H70 V35 H76 M60 45 H70 V35"/><circle cx="60" cy="25" r=".5"/><circle cx="60" cy="45" r=".5"/>
+              <path d="M42 73 H29 L24 73"/><circle cx="42" cy="73" r=".5"/>
+            </svg>
+            <div class="diagram-callout right system-memory">
+              <span class="map-title">System memory</span>
+              <strong class="map-main" data-memory-field="used_bytes">—</strong>
+              <span class="map-detail">used of <b data-memory-field="total_bytes">—</b> total</span>
+              <span class="map-load-label"><span>In use</span><b data-memory-field="used_pct">—</b></span>
+              <progress class="map-load" id="diagram-memory-load" max="100" value="0" aria-label="System memory utilization"></progress>
+              <span class="map-sub"><span>Free</span><b data-memory-field="free_bytes">—</b></span>
+              <span class="map-sub" title="RAM available to applications, including reclaimable caches"><span>Available</span><b data-memory-field="available_bytes">—</b></span>
+              <span class="map-sub"><span>Cached</span><b data-memory-field="cache_bytes">—</b></span>
+              <span class="map-sub"><span>Swap used</span><b data-memory-field="swap_used_bytes">—</b></span>
+              <span class="map-sub" title="Linux PSI: percent of the last 10 seconds with at least one task stalled waiting for memory"><span>Pressure · 10s</span><b data-memory-field="pressure_some_avg10">—</b></span>
+              <span class="map-detail" id="diagram-memory-status">Reading host memory…</span>
+            </div>
+            <div class="diagram-callout left psu-blower">
+              <span class="map-title">PSU blower · fan 1</span>
+              <strong class="map-main" data-diagram-sensor="fan/fan1_rpm" data-unit="RPM">—</strong>
+              <span class="map-sub"><span>Target</span><b data-diagram-sensor="fan/fan1_target_rpm" data-unit="RPM">—</b></span>
+              <span class="map-sub"><span>PSU temperature</span><b data-psu-temperature>—</b></span>
+            </div>
+          </div>
+          <div class="diagram-foot"><span><strong>Live host memory</strong> · used excludes reclaimable memory</span><span>Pressure is memory stall time · positions are approximate</span></div>
         </div>
       </section>
     </div>
@@ -618,7 +631,7 @@
   </main>
 </div>
 
-<script src="/hardware/assets/sensor-diagram.js?v=20261104-4"></script>
+<script src="/hardware/assets/sensor-diagram.js?v=20261104-6"></script>
 <script>
 "use strict";
 
@@ -1285,42 +1298,6 @@ function renderSummary() {
   hdr.className = s.className;
 }
 
-function renderPicker() {
-  const subs = [...new Set(state.metrics.map(m => m.subsystem))].sort();
-  const sel = $("subsystem");
-  if (sel.options.length !== subs.length) {
-    sel.replaceChildren();
-    subs.forEach(s => { const o = el("option", null, s); o.value = s; sel.appendChild(o); });
-  }
-  const sub = sel.value || subs[0];
-  const list = state.metrics.filter(m => m.subsystem === sub);
-  $("chcount").textContent = `${list.length} channels`;
-  const host = $("picker");
-  host.replaceChildren();
-  list.forEach(m => {
-    const label = el("label");
-    const cb = el("input"); cb.type = "checkbox"; cb.value = m.name;
-    cb.addEventListener("change", drawCustom);
-    label.appendChild(cb);
-    label.appendChild(txt(m.name + (m.unit ? ` (${m.unit})` : "")));
-    host.appendChild(label);
-  });
-  drawCustom();
-}
-async function drawCustom() {
-  const picked = [...$("picker").querySelectorAll("input:checked")].map(i => i.value).slice(0, 8);
-  // An empty plot frame with nothing selected reads as broken. Show the frame
-  // only once there is something in it.
-  const card = document.querySelector('[data-chart="custom"]');
-  const plot = card.querySelector(".plot");
-  const hint = $("customhint");
-  plot.hidden = picked.length === 0;
-  $("l-custom").hidden = picked.length === 0;
-  hint.hidden = picked.length > 0;
-  if (!picked.length) { $("d-custom").replaceChildren(); return; }
-  await panel("custom", $("subsystem").value, picked, {});
-}
-
 async function loadEvents() {
   try {
     const hours = Math.max(1, Math.round(rangeSecs() / 3600));
@@ -1472,7 +1449,6 @@ async function refresh() {
       await panel("storage", "hwmon", namesIn("hwmon", /^nvme/), {});
       await panel("net", "hwmon", namesIn("hwmon", /^(enp|amdgpu)/), {});
     }
-    else if (state.tab === "sensors") renderPicker();
     else if (state.tab === "errors") await loadEvents();
     else if (state.tab === "services") await loadServices();
     else if (state.tab === "boot") await loadBoot();
@@ -1539,8 +1515,7 @@ function applyVisibility() {
     const pane = $("tab-" + t), link = document.querySelector(`.rail a[data-tab="${t}"]`);
     if (!pane || !link) return;
     const cards = [...pane.querySelectorAll("section.card")];
-    // The sensor browser is interactive rather than data-backed; it is only
-    // pointless if nothing at all is being logged.
+    // The sensor diagrams need the metric catalogue to identify available channels.
     const alive = t === "sensors" ? state.metrics.length > 0 : cards.some(c => !c.hidden);
     link.hidden = !alive;
     if (!alive && state.tab === t) activeAlive = false;
@@ -1611,7 +1586,6 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 
 $("refresh").addEventListener("click", refresh);
 $("range").addEventListener("change", refresh);
-$("subsystem").addEventListener("change", renderPicker);
 $("auto").addEventListener("click", () => {
   const b = $("auto");
   const on = b.classList.toggle("on");
