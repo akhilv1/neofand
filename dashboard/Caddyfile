@@ -1,0 +1,18 @@
+:4791 {
+    bind 127.0.0.1
+
+    @apiGet {
+        path /api/*
+        method GET
+    }
+    handle @apiGet {
+        reverse_proxy 100.99.26.65:9977
+    }
+    handle /api/* {
+        respond "Method not allowed" 405
+    }
+    handle {
+        root * /srv
+        file_server
+    }
+}
