@@ -34,6 +34,7 @@ services:
       - "127.0.0.1:4792:8080"
     volumes:
       - /home/neo/services/neofand-dashboard/memory_api.py:/app/memory_api.py:ro
+      - /home/neo/services/neofand-dashboard/telemetry:/host/telemetry:ro
       - /proc/meminfo:/host/meminfo:ro
       - /proc/pressure/memory:/host/memory-pressure:ro
     command: ["python", "-B", "/app/memory_api.py"]

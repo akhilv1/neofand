@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh hardware dashboard storage snapshot
+
+[Timer]
+OnBootSec=15s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=neofand-storage.service
+
+[Install]
+WantedBy=timers.target

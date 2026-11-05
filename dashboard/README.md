@@ -44,3 +44,11 @@ The page is static and has no build step. Check JavaScript syntax with `node --c
 After committing the source, write deployment-only `assets/build-info.json` with the full source commit, branch, and an optional PR number. Example: `{"commit":"<full SHA>","branch":"codex/sensor-callouts","pr_number":null}`. Do not commit this generated file or invent a PR number. With no PR, the footer labels the deployment as a branch build. Recreate the dashboard container after replacing its bind-mounted `index.html` so it sees the new inode.
 
 The GPU library currently contains 63 board profiles and 126 SVG projections. Published dimensions determine each envelope; unpublished cooler thickness uses a labeled nominal slot envelope. Apple MPX templates remain explicitly uncalibrated until mechanical dimensions are available. They are not used for dimensional fit claims. The generated 3D preview is an illustration, not a mechanically verified 3D mesh.
+
+## Storage page
+
+`#storage` shows physical disks, partitions, mount points, and filesystem used/available space. Loop devices are excluded. Binary units are explicit. Raw drive capacity is kept separate from filesystem capacity. Unmounted partitions (including APFS) have unknown usage, never zero usage. Totals deduplicate mounted filesystems by device ID; reserved filesystem space is separate from available space.
+
+`storage_collect.py` runs on the host as user neo, using read-only lsblk and statvfs calls. It checks mount device identity to avoid measuring a parent filesystem after an unmount. Install `neofand-storage.service` and `.timer` in /etc/systemd/system, create the deployment's telemetry directory owned by neo, and enable/start the timer. A failed collection leaves the old timestamp intact. The snapshot is atomically replaced every 15 seconds. No drives are mounted or modified.
+
+Only the telemetry directory is mounted read-only into the memory companion; `/api/host-storage` proxies GET /storage. The page follows Auto (30s) and manual Refresh, marks snapshots older than 60s stale, and shows unavailable on fetch failure. The chart range does not alter this latest snapshot.

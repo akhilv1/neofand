@@ -1,6 +1,15 @@
 :4791 {
     bind 127.0.0.1
 
+    @storage {
+        path /api/host-storage
+        method GET
+    }
+    handle @storage {
+        rewrite * /storage
+        reverse_proxy 127.0.0.1:4792
+    }
+
     @memory {
         path /api/host-memory
         method GET

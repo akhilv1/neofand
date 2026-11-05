@@ -304,6 +304,8 @@
 <link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-7">
 <link rel="stylesheet" href="/hardware/assets/runtime.css?v=20261104-7">
 <script src="/hardware/assets/runtime.js?v=20261104-7" defer></script>
+<link rel="stylesheet" href="/hardware/assets/storage.css?v=20261105-1">
+<script src="/hardware/assets/storage.js?v=20261105-1"></script>
 </head>
 <body>
 
@@ -326,6 +328,7 @@
     <a data-tab="power"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Power zones</a>
     <a data-tab="thermal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13V5a2 2 0 1 1 4 0v8a4 4 0 1 1-4 0z"/></svg>Thermal</a>
     <a data-tab="sensors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v10"/><circle cx="12" cy="17" r="4"/></svg>Sensors</a>
+    <a data-tab="storage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18M7 17h.01M11 17h.01"/></svg>Storage</a>
     <a data-tab="errors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Event log</a>
     <div class="grp">System</div>
     <a data-tab="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>Services</a>
@@ -356,6 +359,13 @@
       <span class="stamp" id="status"></span>
     </div>
 
+    <div id="tab-storage" hidden>
+      <section class="card storage-intro"><h2>Storage</h2>
+        <p class="storage-note">Physical drives and their partitions. Used and available space describe mounted filesystems; unmounted partitions are not counted as free space.</p>
+        <div id="storage-summary"></div><div id="storage-status" class="storage-note">Loading storage…</div>
+        <p class="storage-note">Binary units (GiB / TiB). Raw capacity includes partitions, filesystem metadata and unallocated space. Shared filesystems are counted once in the totals. The range selector applies to charts; storage shows the latest snapshot.</p>
+      </section><div id="storage-drives"></div>
+    </div>
     <!-- Dashboard -->
     <div id="tab-overview" class="grid">
       <section class="card wide">
@@ -1414,6 +1424,11 @@ async function refresh() {
   if (state.refreshing) return;
   state.refreshing = true;
   try {
+    if (state.tab === "storage") {
+      await window.neofandStorageRefresh();
+      $("status").textContent = "Storage · latest snapshot";
+      return;
+    }
     $("status").textContent = "Loading…";
     [state.metrics, state.latest] = await Promise.all([getJSON("/hardware/api/metrics"), getJSON("/hardware/api/latest")]);
     window.neofandDiagramUpdate?.(state.latest);
@@ -1538,7 +1553,7 @@ function applyVisibility() {
 }
 
 /* nav */
-const TABS = ["overview", "power", "thermal", "sensors", "errors", "services", "boot"];
+const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];
 function selectTab(name) {
   state.tab = name;
   document.querySelectorAll(".rail a[data-tab]").forEach(x => x.classList.toggle("sel", x.dataset.tab === name));

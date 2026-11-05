@@ -34,11 +34,12 @@ def snapshot():
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path != '/memory':
+        if self.path not in ('/memory', '/storage'):
             self.send_error(404)
             return
         try:
-            body = json.dumps(snapshot(), allow_nan=False).encode()
+            data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/storage.json').read_text())
+            body = json.dumps(data, allow_nan=False).encode()
         except (OSError, ValueError, KeyError):
             self.send_error(503, 'Host memory readings unavailable')
             return
