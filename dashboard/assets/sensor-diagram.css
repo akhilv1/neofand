@@ -47,3 +47,13 @@
   .diagram-callout .map-main { font-size:22px; }
 }
 @container (max-width:500px) { .diagram-frame { grid-template-columns:1fr; } }
+.diagram-callout { padding:clamp(6px,.8cqw,12px); border-radius:clamp(5px,.7cqw,9px); }
+.diagram-callout .map-title { font-size:clamp(9px,.78cqw,11px); line-height:1.3; letter-spacing:.065em; }
+.diagram-callout .map-main { font-size:clamp(18px,1.9cqw,26px); line-height:1.1; margin-top:clamp(3px,.45cqw,6px); }
+.diagram-callout .map-sub { font-size:clamp(10px,.88cqw,12px); margin-top:clamp(4px,.6cqw,8px); padding-top:clamp(4px,.6cqw,8px); gap:3px 6px; }
+.diagram-callout .map-detail { font-size:clamp(9px,.75cqw,10px); margin-top:clamp(3px,.4cqw,6px); }
+.diagram-callout .map-load-label { font-size:clamp(9px,.82cqw,11px); margin-top:clamp(4px,.5cqw,7px); }
+.diagram-callout .map-load { height:clamp(4px,.5cqw,6px); margin-top:clamp(3px,.4cqw,5px); }
+.diagram-callout.system-memory .map-sub { margin-top:clamp(4px,.5cqw,7px); padding-top:clamp(4px,.5cqw,7px); }
+.diagram-actions { display:flex; align-items:center; gap:12px; }
+.diagram-library-link { color:var(--accent); font-size:11px; text-decoration:none; border:1px solid var(--line); padding:5px 8px; border-radius:6px; }

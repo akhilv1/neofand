@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GPU models · NeoCharge</title><link rel="stylesheet" href="library.css"><script src="library.js" defer></script></head>
+<body><header><a href="/hardware/#sensors">NeoCharge / Hardware</a><span>GPU model library</span></header>
+<main>
+  <div class="intro"><div><p class="eyebrow">HARDWARE ASSETS</p><h1>GPU models, drawn to their dimensions.</h1><p>Reusable 2D engineering profiles for local AI cards and Apple MPX modules. Every board keeps its manufacturer variant and source.</p></div><a class="button" href="a6000-system-3d.png" target="_blank" rel="noopener">Your A6000 system · 3D preview ↗</a></div>
+  <div class="tools"><label>Search<input id="search" type="search" placeholder="A6000, 5090, Vega II…"></label><label>Vendor<select id="vendor"><option value="">All vendors</option></select></label><label>Family<select id="category"><option value="">All families</option></select></label><span id="count" role="status">Loading…</span><a href="catalog.json" download>Download manifest</a></div>
+  <section class="workspace">
+    <aside><h2>Board profiles</h2><div id="models" class="models"></div></aside>
+    <article id="detail">
+      <div class="detail-heading"><div><span id="family" class="badge"></span><h2 id="name">Loading models…</h2><p id="variant"></p></div><div class="views" role="group" aria-label="Projection"><button id="face" aria-pressed="true">Board face</button><button id="edge" aria-pressed="false">Installed edge</button></div></div>
+      <div class="preview"><img id="model-image" alt=""><span class="preview-caption">Schematic artwork · dimensional envelope</span></div>
+      <div class="bay"><label>Reference bay length <input id="bay-length" type="number" min="100" max="600" value="305"> mm</label><div class="bay-track"><div id="bay-fill"></div></div><p id="occupancy"></p></div>
+      <div class="spec-grid" id="specs"></div>
+      <p id="notes" class="notice"></p>
+      <div class="links"><a id="source" target="_blank" rel="noopener">Manufacturer specification ↗</a><a id="download" download>Download SVG</a><a id="render-preview" target="_blank" rel="noopener" hidden>Rendered sample ↗</a><a id="chassis-reference" target="_blank" rel="noopener" hidden>Two-module Mac Pro reference ↗</a></div>
+      <p class="fine">Known dimensions control the model geometry. Unpublished cooler thickness uses a nominal slot envelope; it is labeled on the edge view. MPX body dimensions remain uncalibrated. Shroud details are schematic, and length alone does not establish installation compatibility.</p>
+    </article>
+  </section>
+  <footer>Sources checked November 4, 2026 · Partner cards are separate models · <a href="README.md">Modeling notes</a></footer>
+</main></body></html>

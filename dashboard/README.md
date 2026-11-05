@@ -9,9 +9,11 @@ This directory is the source of the separate Portainer `neofand` dashboard stack
 - `index.html`: dashboard, charts, and two annotated chassis panels. The former raw sensor-reading section is removed.
 - `assets/sensor-diagram.js`: updates the callouts and utilization bars from `/api/latest`, plus the independent host-memory snapshot.
 - `assets/sensor-diagram.css`: engineering diagram layout and responsive reading cards.
+- `assets/runtime.js` and `assets/runtime.css`: Auto/Live switches, refresh scheduling, and the build/sample footer.
 - `assets/macpro-gpu-approved.png`: approved illustration with three A6000 cards.
-- `assets/macpro-fan-side.png`: reverse chassis view supplied as a reference.
+- `assets/macpro-memory-cutout.png`: reverse chassis view with its gray background removed.
 - `assets/rtx-a6000-card.png`: approved transparent card artwork for future composition edits.
+- `assets/gpu-library/`: searchable catalog, primary specification links, two dimensioned SVG views per GPU profile, and an illustrative A6000 system perspective render. See its README for dimension assumptions.
 - `Caddyfile` and `compose.yaml`: read-only frontend deployment.
 - `memory_api.py`: a standard-library Python companion that reads only the mounted host `meminfo` and memory PSI files.
 
@@ -27,10 +29,18 @@ The fan map follows the measured roles in `MACPRO71-FINDINGS.md`: fan 1 is the P
 
 The GPU callouts are arranged top to bottom as GPU 2, GPU 0, GPU 1 based on PCI ancestry and firmware slot labels observed on the server: `fc:00.0` / Slot 5, `0d:00.0` / Slot 4, and `0f:00.0` / Slot 3. Recheck this map after moving cards or changing GPU enumeration. Raster placement is illustrative.
 
-The callouts follow the existing 30 second refresh toggle. A failed refresh marks readings unavailable instead of presenting the previous values as fresh. Missing channels display a dash.
+Auto refreshes the current page every 30 seconds. Live mode is available on Dashboard and Sensors: readings update every two seconds, and Dashboard charts refresh every ten seconds. Turning Auto off pauses periodic requests; manual Refresh remains available. Preferences are saved locally. Background tabs do not poll, and refresh requests do not overlap. A failed refresh marks readings unavailable instead of presenting the previous values as fresh. Missing channels display a dash.
+
+Callout text and spacing use container-relative `clamp()` sizes with explicit minima and maxima. Below a 760 px panel width, reading cards move below the chassis image to avoid collisions.
+
+The lower-left footer shows deployed source metadata and the latest recorded telemetry timestamp (the maximum `ts` from `/api/latest`, not the time an HTTP request completed). Deadband logging can leave unchanged channels with older timestamps. Live status requires a successful recent snapshot; stale samples and failed requests show Delayed or Disconnected.
 
 ## Deployment
 
 The deployed source directory is `/home/neo/services/neofand-dashboard`. Portainer owns the `neofand` stack (endpoint 1, stack ID 9). Copy this directory's page, assets, and Caddyfile there, then apply `compose.yaml` through the stack editor. Its volumes mount the page and assets read-only; the host systemd service continues collecting telemetry and controlling fans.
 
 The page is static and has no build step. Check JavaScript syntax with `node --check assets/sensor-diagram.js`, then verify both live panels, changing values, utilization bars, host memory, equal image dimensions, and the reading-card layout on narrow screens. The memory companion has its own health check; its failure leaves the daemon callouts updating and marks the memory readings unavailable.
+
+After committing the source, write deployment-only `assets/build-info.json` with the full source commit, branch, and an optional PR number. Example: `{"commit":"<full SHA>","branch":"codex/sensor-callouts","pr_number":null}`. Do not commit this generated file or invent a PR number. With no PR, the footer labels the deployment as a branch build. Recreate the dashboard container after replacing its bind-mounted `index.html` so it sees the new inode.
+
+The GPU library currently contains 63 board profiles and 126 SVG projections. Published dimensions determine each envelope; unpublished cooler thickness uses a labeled nominal slot envelope. Apple MPX templates remain explicitly uncalibrated until mechanical dimensions are available. They are not used for dimensional fit claims. The generated 3D preview is an illustration, not a mechanically verified 3D mesh.

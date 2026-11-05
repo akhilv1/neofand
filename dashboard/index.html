@@ -301,7 +301,9 @@
     main { padding: 12px; }
   }
 </style>
-<link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-6">
+<link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-7">
+<link rel="stylesheet" href="/hardware/assets/runtime.css?v=20261104-7">
+<script src="/hardware/assets/runtime.js?v=20261104-7" defer></script>
 </head>
 <body>
 
@@ -328,6 +330,11 @@
     <div class="grp">System</div>
     <a data-tab="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>Services</a>
     <a data-tab="boot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v9"/><path d="M6.6 6.6a9 9 0 1 0 10.8 0"/></svg>Boot status</a>
+    <footer class="runtime-footer">
+      <div id="runtime-build">Loading build…</div><span id="runtime-branch"></span>
+      <span class="runtime-sample-label">Last sample</span>
+      <span id="runtime-mode">Connecting</span><time id="runtime-sample">—</time>
+    </footer>
   </nav>
   <div class="scrim" id="scrim"></div>
 
@@ -343,7 +350,9 @@
         <option value="31536000">Last year</option>
       </select>
       <button class="btn" id="refresh">Refresh</button>
-      <button class="btn on" id="auto">Auto 30s</button>
+      <label class="refresh-switch"><input type="checkbox" role="switch" id="auto" checked>Auto</label>
+      <label class="refresh-switch" id="live-control"><input type="checkbox" role="switch" id="live">Live</label>
+      <span id="refresh-cadence">Refresh every 30s</span>
       <span class="stamp" id="status"></span>
     </div>
 
@@ -473,7 +482,7 @@
         <div class="body">
           <div class="diagram-head">
             <div><h2 id="diagram-gpu-title">GPU &amp; CPU side</h2><p>Three RTX A6000s, processor temperature and front intake cooling.</p></div>
-            <span class="diagram-live" role="status">Connecting</span>
+            <div class="diagram-actions"><span class="diagram-live" role="status">Connecting</span><a href="/hardware/assets/gpu-library/" class="diagram-library-link">GPU models ↗</a></div>
           </div>
           <div class="diagram-frame" id="sensor-diagram-frame">
             <img class="diagram-photo" src="/hardware/assets/macpro-gpu-approved.png" alt="GPU side of the Mac Pro with three spaced RTX A6000 cards and hidden mounting tabs">
@@ -520,7 +529,7 @@
               <span class="map-sub"><span>Hottest PSU probe</span><b data-psu-temperature>—</b></span>
             </div>
           </div>
-          <div class="diagram-foot"><span><strong>Live telemetry</strong> · follows the dashboard’s 30 second refresh</span><span>Positions are approximate · fans 2 and 3 share the GPU bay</span></div>
+          <div class="diagram-foot"><span><strong>Sensor telemetry</strong> · follows the refresh controls</span><span>Positions are approximate · fans 2 and 3 share the GPU bay</span></div>
         </div>
       </section>
       <section class="card wide sensor-diagram" aria-labelledby="diagram-reverse-title">
@@ -530,7 +539,7 @@
             <span class="diagram-live" role="status">Connecting</span>
           </div>
           <div class="diagram-frame" id="sensor-diagram-reverse">
-            <img class="diagram-photo" src="/hardware/assets/macpro-fan-side.png" alt="Reverse side of the Mac Pro with memory banks and the PSU blower">
+            <img class="diagram-photo" src="/hardware/assets/macpro-memory-cutout.png" alt="Reverse side of the Mac Pro with memory banks and the PSU blower">
             <svg class="diagram-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path d="M60 25 H70 V35 H76 M60 45 H70 V35"/><circle cx="60" cy="25" r=".5"/><circle cx="60" cy="45" r=".5"/>
               <path d="M42 73 H29 L24 73"/><circle cx="42" cy="73" r=".5"/>
@@ -555,7 +564,7 @@
               <span class="map-sub"><span>PSU temperature</span><b data-psu-temperature>—</b></span>
             </div>
           </div>
-          <div class="diagram-foot"><span><strong>Live host memory</strong> · used excludes reclaimable memory</span><span>Pressure is memory stall time · positions are approximate</span></div>
+          <div class="diagram-foot"><span><strong>Host memory</strong> · used excludes reclaimable memory</span><span>Pressure is memory stall time · positions are approximate</span></div>
         </div>
       </section>
     </div>
@@ -631,7 +640,7 @@
   </main>
 </div>
 
-<script src="/hardware/assets/sensor-diagram.js?v=20261104-6"></script>
+<script src="/hardware/assets/sensor-diagram.js?v=20261104-7"></script>
 <script>
 "use strict";
 
@@ -1402,14 +1411,18 @@ $("reboot").addEventListener("click", async () => {
 });
 
 async function refresh() {
+  if (state.refreshing) return;
+  state.refreshing = true;
   try {
     $("status").textContent = "Loading…";
     [state.metrics, state.latest] = await Promise.all([getJSON("/hardware/api/metrics"), getJSON("/hardware/api/latest")]);
     window.neofandDiagramUpdate?.(state.latest);
+    window.neofandRuntime?.sample(state.latest);
     renderSummary();
     applyVisibility();
 
     if (state.tab === "overview") {
+      state.lastChartRefresh = Date.now();
       const dc = latestOf("smc_power", "PZ0E"), psu = latestOf("smc_power", "PZ7E");
       const refs = [];
       if (dc) refs.push({ value: dc, label: `DC ceiling ${dc.toFixed(0)} W` });
@@ -1454,7 +1467,7 @@ async function refresh() {
     else if (state.tab === "boot") await loadBoot();
 
     $("status").textContent = `${state.metrics.length} channels · ${new Date().toLocaleTimeString()}`;
-  } catch (e) { window.neofandDiagramError?.(); $("status").textContent = "Error: " + e.message; }
+  } catch (e) { window.neofandDiagramError?.(); window.neofandRuntime?.error(); $("status").textContent = "Error: " + e.message; } finally { state.refreshing = false; }
 }
 
 
@@ -1528,9 +1541,10 @@ function applyVisibility() {
 const TABS = ["overview", "power", "thermal", "sensors", "errors", "services", "boot"];
 function selectTab(name) {
   state.tab = name;
-  document.querySelectorAll(".rail a").forEach(x => x.classList.toggle("sel", x.dataset.tab === name));
+  document.querySelectorAll(".rail a[data-tab]").forEach(x => x.classList.toggle("sel", x.dataset.tab === name));
   TABS.forEach(t => { const p = $("tab-" + t); if (p) p.hidden = t !== name; });
   buildStrip();
+  window.neofandRuntime?.modeChanged();
 }
 
 /* The strip mirrors the rail rather than duplicating its markup, so a tab hidden
@@ -1540,7 +1554,7 @@ function buildStrip() {
   const strip = $("tabstrip");
   if (!strip) return;
   strip.replaceChildren();
-  document.querySelectorAll(".rail a").forEach(a => {
+  document.querySelectorAll(".rail a[data-tab]").forEach(a => {
     if (a.hidden) return;
     const b = el("button", a.dataset.tab === state.tab ? "sel" : null);
     b.type = "button";
@@ -1555,7 +1569,7 @@ function buildStrip() {
     strip.appendChild(b);
   });
 }
-document.querySelectorAll(".rail a").forEach(a => a.addEventListener("click", () => {
+document.querySelectorAll(".rail a[data-tab]").forEach(a => a.addEventListener("click", () => {
   selectTab(a.dataset.tab);
   document.body.classList.remove("nav");
   $("navbtn").setAttribute("aria-expanded", "false");
@@ -1586,13 +1600,6 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 
 $("refresh").addEventListener("click", refresh);
 $("range").addEventListener("change", refresh);
-$("auto").addEventListener("click", () => {
-  const b = $("auto");
-  const on = b.classList.toggle("on");
-  clearInterval(state.timer);
-  state.timer = on ? setInterval(refresh, 30000) : null;
-});
-state.timer = setInterval(refresh, 30000);
 let rz;
 window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(refresh, 250); });
 
