@@ -74,3 +74,12 @@ export function firstFreeSlot(model,items,models,options={}) {
   }
   return null;
 }
+
+// Snap by physical connector offset, never by equally spaced slot numbers.
+export function nearestConnector(units,mpx=false) {
+  const choices=SLOTS.filter(s=>!mpx||s.id===1||s.id===3);
+  return choices.reduce((best,s)=>Math.abs(s.units-units)<Math.abs(best.units-units)?s:best).id;
+}
+export function checkMove(item,slot,items,models,options={}) {
+  return assess(items.map(i=>i.id===item.id?{...i,slot}:i),models,options).cards.find(c=>c.item.id===item.id);
+}

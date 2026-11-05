@@ -52,3 +52,7 @@ Power sockets/connectors are intentionally absent from the clean presentation ar
 The preview does not certify driver/OS compatibility, lane allocation, PSU power or connector capacity, airflow, cable bend radius, or perpendicular board-height clearance. A card with no drawn overlap can still need additional room. Confirm clearances on the actual machine before moving hardware.
 
 See [each OEM card's dimensions and sources](CARD-DIMENSIONS.md). The JSON manifest is `../catalog.json`. NVIDIA workstation lengths deliberately vary by model: compact cards are about 167.6 mm, A4000/RTX 4000 are 241.3 mm, many full-size models are 266.7 mm, and RTX PRO 6000 Blackwell Workstation is 304.8 mm. [NVIDIA comparison](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/).
+
+## Drag placement
+
+Drag a card vertically to preview its nearest connector by physical offset. Positions 1–4 use double-wide connector spacing; positions 5–8 use single-wide spacing. MPX snaps only to connectors 1 and 3. Green outlines indicate an allowed drop, red outlines a blocked one. Collision, I/O, bay-length, MPX and extra-gap checks run before committing a drop; rejected drops restore the previous slot. Release outside the chassis or press Escape to cancel. Focus a card and use Up/Down for the same validated placement. Connector dropdown changes use the same rules.

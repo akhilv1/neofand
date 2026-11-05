@@ -4,3 +4,6 @@
 #chassis-cards{position:absolute;inset:0;clip-path:polygon(0 0,87.0% 0,87.0% 100%,0 100%);z-index:4;pointer-events:none}.chassis-slots{z-index:7}.builder-card img{clip-path:inset(0 .6% 0 0)}
 
 .builder-raster-crop{position:absolute;inset:0;overflow:hidden;border-radius:2px}.builder-raster-crop .builder-raster{position:absolute;max-width:none;object-fit:fill;clip-path:none}
+
+/* Pointer capture keeps touch, pen and mouse placement on the physical slot grid. */
+.builder-card{pointer-events:auto;cursor:grab;touch-action:none;user-select:none}.builder-card img{pointer-events:none}.builder-card:focus-visible{outline:3px solid #378bba;outline-offset:3px}.builder-card.dragging{cursor:grabbing;z-index:5;opacity:.85}.builder-card[data-drop=allowed]{outline:3px solid #259872}.builder-card[data-drop=blocked]{outline:3px solid #d05c40}.is-dragging .chassis-slot{left:25%;width:73%;border-bottom:1px dashed #56836b88}.is-dragging .chassis-slot[data-target=true]{border-bottom:2px solid #2e9f7e}.is-dragging .chassis-slot[data-target=true] span{background:#d5f6e5;color:#174d3a}

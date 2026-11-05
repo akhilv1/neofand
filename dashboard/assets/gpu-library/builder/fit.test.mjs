@@ -23,3 +23,9 @@ test('auto placement skips collision',()=>assert.equal(firstFreeSlot(models[0],[
 test('nominal pitch remains20.32 and gap is checked',()=>{assert.equal(PITCH,20.32);assert.equal(assess([c('a','two',1),c('b','two',2)],models,{gap_mm:2}).hasErrors,true);});
 
 test('calibrated pitch controls unknown nominal thickness and reserved width',()=>{const env=assess([c('a','unknown',1)],models,{pitch_mm:21}).cards[0].env;assert.equal(env.thickness,42);assert.equal(env.width,42);});
+
+import {nearestConnector,checkMove} from './fit.mjs';
+test('drag snapping respects double then single connector pitches',()=>{assert.equal(nearestConnector(2.8),2);assert.equal(nearestConnector(3.2),3);assert.equal(nearestConnector(8.6),6);assert.equal(nearestConnector(10.8),8);});
+test('MPX snaps only to its two bays',()=>{assert.equal(nearestConnector(1.9,true),1);assert.equal(nearestConnector(2.1,true),3);assert.equal(nearestConnector(11,true),3);});
+test('move validates destination without mutating original slot',()=>{const items=[c('a','three',1),c('b','two',3)];assert.ok(checkMove(items[0],2,items,models).errors.length);assert.equal(items[0].slot,1);assert.equal(checkMove(items[0],5,items,models).errors.length,0);});
+test('moving a card ignores its previous occupancy but blocks reserved IO',()=>{const item=c('a','two',1);assert.equal(checkMove(item,2,[item],models).errors.length,0);assert.ok(checkMove(item,7,[item],models).errors.length);});

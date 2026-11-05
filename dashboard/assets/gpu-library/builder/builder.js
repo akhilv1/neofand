@@ -1,4 +1,4 @@
-import {SLOTS,assess,firstFreeSlot} from './fit.mjs';
+import {SLOTS,assess,firstFreeSlot,nearestConnector,checkMove} from './fit.mjs?v=drag1';
 const $=id=>document.getElementById(id);
 const ANCHOR=79.66, PHOTO_PITCH=3.59;
 let models=[],items=[],lastModel=decodeURIComponent(location.hash.slice(1))||'rtx-a6000';
@@ -16,9 +16,49 @@ function load(data){
  for(const [id,key,min,max] of [['build-bay','bay_mm',100,600],['build-pitch','pitch_mm',10,40],['build-gap','gap_mm',0,50]])if(Number.isFinite(Number(o[key])))$(id).value=Math.max(min,Math.min(max,Number(o[key])));
  $('build-io').checked=true;
 }
+
+function place(item,slot){
+ const candidate=checkMove(item,slot,items,models,options());
+ const allowed=candidate&&!candidate.errors.length;
+ if(allowed)item.slot=slot;
+ $('builder-message').textContent=allowed?`${candidate.model.name} snapped to slot ${slot}.`:`Cannot place in slot ${slot}: ${candidate?.errors.join('; ')||'Unknown card'}. Card returned to slot ${item.slot}.`;
+ render();
+ return allowed;
+}
+function draggable(n,c){
+ n.tabIndex=0;n.setAttribute('role','button');n.setAttribute('aria-label',`Move ${c.model.name}, slot ${c.item.slot}. Drag to a connector or use Up and Down arrows.`);
+ let drag=null;
+ const end=(commit=false)=>{if(!drag)return;const d=drag;drag=null;
+  if(n.hasPointerCapture(d.id))n.releasePointerCapture(d.id);
+  $('chassis-stage').classList.remove('is-dragging');
+  if(commit&&d.inside)place(c.item,d.slot);else{render();$('builder-message').textContent=`Move cancelled. Card remains in slot ${c.item.slot}.`;}
+ };
+ n.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();n.focus();const rect=$('chassis-stage').getBoundingClientRect();
+  drag={id:e.pointerId,y:e.clientY,rect,units:SLOTS.find(s=>s.id===c.item.slot).units,slot:c.item.slot,inside:true};
+  n.setPointerCapture(e.pointerId);n.classList.add('dragging');$('chassis-stage').classList.add('is-dragging');
+ });
+ n.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;
+  const d=drag;d.inside=e.clientX>=d.rect.left&&e.clientX<=d.rect.right&&e.clientY>=d.rect.top&&e.clientY<=d.rect.bottom;
+  d.slot=nearestConnector(d.units-(e.clientY-d.y)/d.rect.height*100/PHOTO_PITCH,c.env.mpx);
+  const target=checkMove(c.item,d.slot,items,models,options());
+  n.style.top=`${ANCHOR-SLOTS.find(s=>s.id===d.slot).units*PHOTO_PITCH-c.env.thickness*PHOTO_PITCH/options().pitch_mm}%`;
+  n.dataset.drop=target.errors.length||!d.inside?'blocked':'allowed';
+  for(const guide of $('chassis-slots').children)guide.dataset.target=String(Number(guide.dataset.slot)===d.slot);
+  $('builder-message').textContent=!d.inside?'Release outside the chassis to cancel.':target.errors.length?`Slot ${d.slot} blocked: ${target.errors.join('; ')}`:`Release to snap ${c.model.name} into slot ${d.slot}.`;
+ });
+ n.addEventListener('pointerup',e=>{if(drag?.id===e.pointerId)end(true);});
+ n.addEventListener('pointercancel',()=>end());n.addEventListener('lostpointercapture',()=>end());
+ n.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();end();return;}if(drag||!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();
+  const choices=SLOTS.filter(s=>s.id!==8&&(!c.env.mpx||s.id===1||s.id===3));
+  const at=choices.findIndex(s=>s.id===c.item.slot),next=choices[at+(e.key==='ArrowUp'?1:-1)];
+  if(next){place(c.item,next.id);document.querySelector(`[data-card-id="${c.item.id}"]`)?.focus();}
+ });
+ n.dataset.cardId=c.item.id;
+}
+
 function tableSpacing(result){
  $('slot-spacing-table').replaceChildren(...SLOTS.map((s,i)=>{const tr=node('tr');[s.id,s.id===8?'Half-length I/O':s.width===2?'Double-wide':'Single-wide',`${(s.units*result.pitch).toFixed(2)} mm`,i<7?`${((SLOTS[i+1].units-s.units)*result.pitch).toFixed(2)} mm`:'—'].forEach(t=>tr.append(node('td',null,t)));return tr;}));
- $('chassis-slots').replaceChildren(...SLOTS.map(s=>{const n=node('div','chassis-slot');n.style.top=`${ANCHOR-s.units*PHOTO_PITCH}%`;n.append(node('span',null,`${s.id}${s.id===8?' · I/O':''}`));return n;}));
+ $('chassis-slots').replaceChildren(...SLOTS.map(s=>{const n=node('div','chassis-slot');n.dataset.slot=s.id;n.style.top=`${ANCHOR-s.units*PHOTO_PITCH}%`;n.append(node('span',null,`${s.id}${s.id===8?' · I/O':''}`));return n;}));
 }
 function cardFields(c){
  const box=node('section','placed-card');
@@ -26,7 +66,7 @@ function cardFields(c){
  const remove=node('button','remove-card','Remove');remove.setAttribute('aria-label',`Remove ${c.model.name}`);remove.addEventListener('click',()=>{items=items.filter(i=>i.id!==c.item.id);render();});heading.append(names,remove);box.append(heading);
  const fields=node('div','placed-fields');
  const slotLabel=node('label',null,c.env.mpx?'MPX bay':'Connector slot');const select=node('select');select.setAttribute('aria-label',`${c.model.name} slot`);
- for(const s of SLOTS.filter(s=>s.id!==8&&(!c.env.mpx||s.id===1||s.id===3))){const o=node('option',null,c.env.mpx?s.id===1?'A · slots 1–2':'B · slots 3–4':`Slot ${s.id} · x${s.lanes}`);o.value=s.id;select.append(o);}select.value=c.item.slot;select.addEventListener('change',()=>{c.item.slot=Number(select.value);render();});slotLabel.append(select);fields.append(slotLabel);
+ for(const s of SLOTS.filter(s=>s.id!==8&&(!c.env.mpx||s.id===1||s.id===3))){const o=node('option',null,c.env.mpx?s.id===1?'A · slots 1–2':'B · slots 3–4':`Slot ${s.id} · x${s.lanes}`);o.value=s.id;select.append(o);}select.value=c.item.slot;select.addEventListener('change',()=>{place(c.item,Number(select.value));});slotLabel.append(select);fields.append(slotLabel);
  for(const [key,label,known] of [['length_mm','Length · mm',c.model.length_mm],['thickness_mm','Thickness · mm',c.model.thickness_mm]]){const wrap=node('label',null,label),input=node('input');input.type='number';input.min=1;input.max=key==='length_mm'?600:160;input.step='0.1';input.placeholder=known?String(known):`~${(key==='length_mm'?c.env.length:c.env.thickness).toFixed(1)}`;input.value=c.item[key]??'';input.setAttribute('aria-label',`${c.model.name} ${label}`);input.addEventListener('change',()=>{const v=Number(input.value);c.item[key]=Number.isFinite(v)&&v>0?Math.min(Number(input.max),v):null;render();});wrap.append(input);fields.append(wrap);}box.append(fields);
  const published=c.model.slots==null?'not published':c.model.slots;
  box.append(node('p','placed-summary',`Published slots: ${published} · occupied width ${c.env.width.toFixed(1)} mm · bay remainder ${(options().bay_mm-c.env.length).toFixed(1)} mm`));
@@ -42,7 +82,7 @@ function render(){
  // not eight equally-spaced positions. Native-body assets have no dimension arrows.
  const scaleY=PHOTO_PITCH/result.pitch; const right=87.4; const bayWidth=62.3;
  for(const c of result.cards){if(!c.env)continue;const n=node('div','builder-card');n.dataset.invalid=String(c.errors.length>0);n.dataset.estimated=String(c.env.estimated);n.style.width=`${c.env.length/result.bay*bayWidth}%`;n.style.height=`${c.env.thickness*scaleY}%`;n.style.left=`${right-c.env.length/result.bay*bayWidth}%`;n.style.top=`${ANCHOR-c.env.start*scaleY-c.env.thickness*scaleY}%`;n.title=`${c.model.name} · slot ${c.item.slot} · ${c.env.length.toFixed(1)} × ${c.env.thickness.toFixed(1)} mm`;
- const img=node('img');img.src=c.model.installed_asset||`models/${c.model.id}-installed.svg`;img.alt=`${c.model.name} installed in slot ${c.item.slot}`;
+ draggable(n,c);const img=node('img');img.draggable=false;img.src=c.model.installed_asset||`models/${c.model.id}-installed.svg`;img.alt=`${c.model.name} installed in slot ${c.item.slot}`;
  if(c.model.raster_crop){const crop=node('div','builder-raster-crop'),r=c.model.raster_crop,[x,y,x2,y2]=r.box,w=x2-x,h=y2-y;img.className='builder-raster';img.style.width=`${r.image_width/w*100}%`;img.style.height=`${r.image_height/h*100}%`;img.style.left=`${-x/w*100}%`;img.style.top=`${-y/h*100}%`;crop.append(img);n.append(crop);}else n.append(img);
  n.append(node('span','builder-card-name',`${c.model.name} · ${c.item.slot}`));holder.append(n);}
  tableSpacing(result);save();
