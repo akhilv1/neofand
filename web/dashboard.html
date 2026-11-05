@@ -575,11 +575,79 @@ async function getJSON(url, opts) {
   }
   return r.json();
 }
+/* Bucket width for the current range. Kept as its own function because
+   gapThreshold() has to agree with what was actually requested -- the server
+   only widens `step` past this when (to-from)/step would exceed MAX_POINTS, and
+   this formula fixes that ratio at 800, so it never does. */
+const stepSecs = () => Math.max(10, Math.floor(rangeSecs() / 800));
+
 async function series(sub, names) {
   if (!names.length) return { series: [] };
   const to = Math.floor(Date.now() / 1000), from = to - rangeSecs();
-  const step = Math.max(10, Math.floor(rangeSecs() / 800));
-  return getJSON(`/api/series?subsystem=${encodeURIComponent(sub)}&name=${names.map(encodeURIComponent).join(",")}&from=${from}&to=${to}&step=${step}`);
+  return getJSON(`/api/series?subsystem=${encodeURIComponent(sub)}&name=${names.map(encodeURIComponent).join(",")}&from=${from}&to=${to}&step=${stepSecs()}`);
+}
+
+/* ------------------------------------------------------------------ *
+ * Outage gaps.
+ *
+ * A missing bucket does NOT mean "no data". The store is deadbanded: a row is
+ * written only when a value moves past its threshold, or every heartbeat_secs
+ * so a flat channel still leaves a trace. "Unchanged since the last row" is the
+ * literal meaning of a gap, which is why averageGroups() holds values forward
+ * and why api_energy() integrates them as a step.
+ *
+ * So the bar for calling a stretch an outage has to sit above the heartbeat,
+ * not above `step`. 600 s is twice the default heartbeat, matching api_energy's
+ * DT_CAP -- the same judgement, made in the same units, for the same reason.
+ * (Both are hardcoded to the *default* heartbeat_secs=300. Raising that in the
+ * config past 300 without changing these two constants would make flat channels
+ * read as outages.)
+ *
+ * The floor also has to scale with the bucket: on a month view `step` is ~54 min,
+ * so consecutive buckets are legitimately further apart than 600 s and a fixed
+ * threshold would flag the entire chart as missing. Past 1.5 buckets of silence
+ * a bucket genuinely produced no rows.
+ * ------------------------------------------------------------------ */
+const GAP_MIN_SECS = 600;
+const gapThreshold = () => Math.max(GAP_MIN_SECS, stepSecs() * 1.5);
+
+/* Insert explicit zeros across outages so a dead stretch reads as zero rather
+ * than as a straight line interpolated between the readings either side of it.
+ *
+ * The zeros are placed one bucket inside the gap at each end, so the line drops
+ * vertically at the moment logging stopped and climbs back when it resumed,
+ * instead of sloping across the whole outage.
+ *
+ * A point from /api/series is [ts, avg, low, high] -- four elements, because the
+ * bucket carries its own min and max. So the synthetic marker goes at index 4,
+ * NOT index 2: a marker at 2 collides with `low`, which is non-zero for a real
+ * reading and therefore flags every real point as synthetic. Synthetic points
+ * keep the full four-element shape so a point is one shape everywhere.
+ *
+ * render() draws them -- that is the whole point -- but dataTable() filters them
+ * back out, because a fabricated 0 must never be reported as an observed Min or
+ * counted as a real sample. Every other consumer reads p[0]/p[1] only. */
+const SYNTHETIC = 4;
+const isSynthetic = (p) => !!p[SYNTHETIC];
+
+function zeroFillGaps(dataset) {
+  const limit = gapThreshold(), step = stepSecs();
+  return dataset.map(s => {
+    if (!s || !s.points || s.points.length < 2) return s;
+    const points = [];
+    s.points.forEach((p, i) => {
+      const prev = s.points[i - 1];
+      if (prev && p[0] - prev[0] > limit) {
+        // Clamp inward so a gap barely over the threshold cannot emit zeros
+        // out of order, or past the live reading on the far side.
+        const a = Math.min(prev[0] + step, p[0] - 1);
+        const b = Math.max(p[0] - step, a);
+        points.push([a, 0, 0, 0, true], [b, 0, 0, 0, true]);
+      }
+      points.push(p);
+    });
+    return { ...s, points };
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -778,7 +846,9 @@ function dataTable(key, dataset) {
   put(host, table(
     ["Series", { label: "Latest", num: true }, { label: "Min", num: true }, { label: "Max", num: true }, { label: "Points", num: true }],
     dataset.map(s => {
-      const vals = s.points.map(p => p[1]);
+      // Observed rows only. The zeros zeroFillGaps() adds are a drawing device;
+      // counting them would report a Min of 0 for a channel that never read 0.
+      const vals = s.points.filter(p => !isSynthetic(p)).map(p => p[1]);
       return [
         s.name,
         { text: vals.length ? vals[vals.length - 1].toFixed(1) : "–", cls: "num" },
@@ -983,10 +1053,12 @@ async function loadCooling() {
     const ceiling = m ? latestOf("fan", `fan${m[1]}_max_rpm`) : null;
     return { name: s.name, points: ceiling ? s.points.map(p => [p[0], p[1] / ceiling * 100]) : [] };
   });
-  const ds = [
+  // After averaging, not before: averageGroups() holds each member's last value
+  // forward, so a gap in its output is a stretch where no member wrote at all.
+  const ds = zeroFillGaps([
     ...averageGroups(asPct, FAN_GROUPS),
     ...averageGroups(cards, [{ name: "GPU cards", members: blowers }])
-  ];
+  ]);
   render("fans", ds, { zeroBase: true, maxY: 100 });
   legend("fans", ds); dataTable("fans", ds); wireHover("fans");
 }
@@ -997,10 +1069,10 @@ async function loadLoad() {
     { sub: "host", names: ["cpu_pct", "mem_used_pct"].filter(n => has("host", n)) },
     { sub: "gpu", names: gpuUtil }
   ]);
-  const ds = [
+  const ds = zeroFillGaps([
     ...host.map(s => ({ name: s.name === "cpu_pct" ? "CPU" : "Memory", points: s.points })),
     ...averageGroups(gpu, [{ name: "GPU cores", members: gpuUtil }])
-  ];
+  ]);
   render("load", ds, { zeroBase: true, maxY: 100 });
   legend("load", ds); dataTable("load", ds); wireHover("load");
 }
@@ -1009,6 +1081,7 @@ async function panel(key, sub, names, opts = {}) {
   let ds = [];
   try { ds = names.length ? (await series(sub, names)).series : []; } catch (e) { ds = []; }
   if (opts.transform) ds = opts.transform(ds);
+  ds = zeroFillGaps(ds);
   if (opts.colors) ds.forEach((s, i) => { s.color = opts.colors[i]; });
   render(key, ds, opts);
   legend(key, ds);
@@ -1260,10 +1333,10 @@ async function refresh() {
         { sub: "gpu", names: gpuTemps },
         { sub: "hwmon", names: cpuTemps }
       ]);
-      const tds = [
+      const tds = zeroFillGaps([
         ...gt.map(x => ({ name: x.name.replace(/_temp_c$/, ""), points: x.points })),
         ...ct.map(x => ({ name: "CPU package", points: x.points }))
-      ];
+      ]);
       render("temps", tds, {});
       legend("temps", tds); dataTable("temps", tds); wireHover("temps");
       await loadCooling();

@@ -1,7 +1,11 @@
 # neofand
 
-A fan daemon that drives **each fan from the component it actually cools**, for
-machines where the GPUs — not the CPU — are what get hot.
+Hardware monitoring and per-component fan control for Linux workstations.
+neofand pairs a Mac Pro fan daemon with a live hardware dashboard, visual sensor
+callouts, a GPU system builder, and storage topology and usage views.
+
+The daemon drives **each fan from the component it actually cools**, for machines
+where GPU workloads dominate the thermal load.
 
 Forked from [T2FanRD](https://github.com/GnomedDev/T2FanRD) (GPL-3.0-or-later),
 which curves off CPU package temperature. On a compute box that is the wrong
@@ -25,6 +29,55 @@ Originally written for a Mac Pro 7,1 (MacPro7,1) driving two Vega 20 dies. The
 GPU/CPU sensor layer is vendor-agnostic; the SMC-backed features (cover
 detection, total system power, PSU sensors) are Apple-specific and degrade to
 no-ops elsewhere.
+
+## Hardware dashboard
+
+| Platform | What is supported | Start here |
+|---|---|---|
+| Mac Pro 7,1 running Linux | Apple SMC chassis cooling, NVIDIA/AMD temperature sources, PSU power, cover interlock, and two-sided sensor diagrams | [Daemon installation](#build-and-install) · [Dashboard deployment](dashboard/README.md) |
+| Linux / Lenovo ThinkStation P620 | Read-only CPU, memory/PSI, hwmon, NVIDIA telemetry, storage and event snapshots; P620 sensor callouts | [Linux adapter](dashboard/linux/README.md) |
+| Proxmox LXC | Native systemd web/API image with a separate physical-host collector and read-only telemetry mount | [LXC packaging](dashboard/lxc/README.md) |
+
+The Linux adapter does not control chassis fans or invent missing PSU readings.
+The LXC package has configuration/API checks; a real Proxmox container boot is
+still unverified.
+
+- **Live sensors:** CPU/GPU load bars, temperatures, GPU board power and fan duty,
+  memory used/free/available/cache/swap and Linux memory pressure. Auto refresh
+  and live sampling controls show the last sample time and source build.
+- **Storage:** physical drives, boot/system badges, readable filesystem usage,
+  unknown usage for unreadable partitions, and ZFS pool/mirror topology without
+  double-counting shared capacity. Optional category indexing uses a persistent
+  metadata cache and reconciliation; it is not a filesystem journal.
+- **GPU system builder:** combine PCIe and Apple MPX models inside chassis views,
+  with model dimensions, slot occupancy and collision checks. Artwork is
+  illustrative; exact board variants, connectors and cable clearances still
+  require physical verification. See the [GPU library](dashboard/assets/gpu-library/README.md).
+- **History and events:** temperature/power trends and host event snapshots.
+  A telemetry gap is an inferred interruption, not proof of a power failure.
+
+### Live server screenshots
+
+Captured from running servers on November 5, 2026. Identifying headers, hostnames,
+network addresses, browser chrome and navigation are cropped out before
+publication. Sensor readings are genuine samples, not generated demo values.
+Chassis artwork and sensor anchor locations are illustrative.
+
+**Mac Pro — three RTX A6000s, CPU, intake fans and total PSU load**
+
+![Mac Pro GPU-side live sensor callouts](docs/screenshots/mac-pro-gpu-sensors.jpg)
+
+**Mac Pro — memory usage, pressure and PSU cooling**
+
+![Mac Pro memory and PSU-side live sensor callouts](docs/screenshots/mac-pro-memory-sensors.jpg)
+
+**ThinkStation P620 — CPU, memory and RTX 3090**
+
+![P620 live sensor callouts](docs/screenshots/p620-sensors.jpg)
+
+The P620 rendering uses illustrative Founders Edition artwork; the exact board
+variant and physical slot are not verified. Total PSU power and chassis fan RPM
+are unavailable on that host.
 
 ## Why this exists
 
@@ -293,6 +346,22 @@ by default; set `use_nvml=false` under `[Gpu]` to disable.
 
 Build without the dependency entirely using `cargo build --release
 --no-default-features`; the backend compiles to a no-op stub.
+
+### `power_limit_watts`
+
+Board power cap applied to every NVIDIA card at startup, in watts, under
+`[Gpu]`. Default `0` leaves the driver default alone.
+
+```ini
+power_limit_watts=250
+```
+
+The driver resets power limits to the card default on every boot, so a cap set
+by hand with `nvidia-smi -pl` silently disappears after a reboot. On a machine
+plugged straight into the wall that brings back the full stock draw (3 x 300 W on
+three A6000s). The value is clamped to the range each card accepts, and each
+card's result is logged as `nvml [N] power limit ... W`. The cap is not removed
+when the daemon stops: it is a safety limit, not a fan setting.
 
 ### Sensor semantics differ from AMD — read this before tuning
 

@@ -325,6 +325,14 @@ pub struct GpuConfig {
     /// the only way to see them; harmless to leave on with no NVIDIA driver
     /// present, since the library is loaded at runtime.
     pub use_nvml: bool,
+    /// Board power cap applied to every NVIDIA card at startup, in watts.
+    ///
+    /// The driver resets power limits to the card default on every boot, so a
+    /// cap set by hand with `nvidia-smi -pl` silently disappears and the cards
+    /// come back at full power. On a machine wired straight to the wall that is
+    /// a breaker or PSU trip waiting to happen. Clamped to the range the card
+    /// accepts. 0 leaves the driver default alone.
+    pub power_limit_watts: u32,
     /// How long to keep re-scanning for GPUs after startup, in seconds.
     ///
     /// A GPU driver registers its hwmon node at the end of its probe, which can
@@ -349,6 +357,7 @@ impl Default for GpuConfig {
             sensor_preference: SensorPreference::Junction,
             extra_temp_paths: Vec::new(),
             use_nvml: true,
+            power_limit_watts: 0,
             settle_secs: 30,
         }
     }
@@ -703,6 +712,11 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         ),
         extra_temp_paths: get_list(gpu_section, "extra_temp_paths", Vec::new()),
         use_nvml: get_or(gpu_section, "use_nvml", gpu_defaults.use_nvml),
+        power_limit_watts: get_or(
+            gpu_section,
+            "power_limit_watts",
+            gpu_defaults.power_limit_watts,
+        ),
         settle_secs: get_or(gpu_section, "settle_secs", gpu_defaults.settle_secs),
     };
 
@@ -829,6 +843,7 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
         .set("sensor_preference", gpu.sensor_preference.to_string())
         .set("extra_temp_paths", gpu.extra_temp_paths.join(","))
         .set("use_nvml", gpu.use_nvml.to_string())
+        .set("power_limit_watts", gpu.power_limit_watts.to_string())
         .set("settle_secs", gpu.settle_secs.to_string());
 
     // Written out disabled, with the thresholds visible, so the keys are
@@ -875,6 +890,14 @@ pub fn load_config(fan_count: NonZeroUsize) -> Result<Config> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn power_limit_is_opt_in_and_parses_watts() {
+        let count = NonZeroUsize::new(4).unwrap();
+        assert_eq!(parse("", count).unwrap().gpu.power_limit_watts, 0);
+        assert_eq!(parse("[Gpu]\npower_limit_watts=250\n", count).unwrap().gpu.power_limit_watts, 250);
+        assert_eq!(parse("[Gpu]\npower_limit_watts=-1\n", count).unwrap().gpu.power_limit_watts, 0);
+    }
 
     fn cfg(low: u8, high: u8) -> GpuFanConfig {
         GpuFanConfig {

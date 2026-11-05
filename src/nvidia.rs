@@ -101,6 +101,35 @@ mod imp {
         raw: Option<NvmlLib>,
     }
 
+    /// Cap every card's board power, clamped to the range the card accepts.
+    ///
+    /// Applied once at startup: the driver keeps the limit while it stays
+    /// loaded, and this daemon's open NVML handle keeps it loaded. A card that
+    /// refuses is reported and the rest are still capped.
+    fn apply_power_limit(nvml: &Nvml, devices: &[NvDevice], watts: u32) {
+        for info in devices {
+            let Ok(mut device) = nvml.device_by_index(info.index) else {
+                continue;
+            };
+            let mut milliwatts = watts.saturating_mul(1000);
+            if let Ok(range) = device.power_management_limit_constraints() {
+                milliwatts = milliwatts.clamp(range.min_limit, range.max_limit);
+            }
+            match device.set_power_management_limit(milliwatts) {
+                Ok(()) => println!(
+                    "neofand: nvml [{}] power limit {} W",
+                    info.index,
+                    milliwatts / 1000
+                ),
+                Err(err) => eprintln!(
+                    "neofand: nvml [{}] power limit {} W failed: {err}",
+                    info.index,
+                    milliwatts / 1000
+                ),
+            }
+        }
+    }
+
     fn sample_to_temp(value: SampleValue) -> Option<u32> {
         match value {
             SampleValue::U32(v) => Some(v),
@@ -114,7 +143,7 @@ mod imp {
     impl NvidiaBackend {
         /// Returns `None` when no NVIDIA driver is present, which is not an
         /// error — it is the normal case on an AMD-only machine.
-        pub fn init(read_memory: bool, gpu_fans: GpuFanConfig) -> Option<Self> {
+        pub fn init(read_memory: bool, gpu_fans: GpuFanConfig, power_limit_watts: u32) -> Option<Self> {
             let nvml = match Nvml::init() {
                 Ok(nvml) => nvml,
                 Err(err) => {
@@ -178,6 +207,10 @@ mod imp {
             if devices.is_empty() {
                 println!("neofand: NVML loaded but exposed no usable GPU");
                 return None;
+            }
+
+            if power_limit_watts > 0 {
+                apply_power_limit(&nvml, &devices, power_limit_watts);
             }
 
             // Safety: loading the driver's own library by soname. Failure is
@@ -445,7 +478,11 @@ mod imp {
     }
 
     impl NvidiaBackend {
-        pub fn init(_read_memory: bool, _gpu_fans: GpuFanConfig) -> Option<Self> {
+        pub fn init(
+            _read_memory: bool,
+            _gpu_fans: GpuFanConfig,
+            _power_limit_watts: u32,
+        ) -> Option<Self> {
             None
         }
         pub fn temps_each(&self) -> Vec<(u32, u8)> {
