@@ -26,7 +26,7 @@
     }
     $('render-preview').textContent=model.render_preview_label || 'Rendered sample ↗';
     $('notes').textContent=model.notes || (model.thickness_mm ? 'Manufacturer dimensions recorded for this board variant.' : 'Exact cooler thickness is unpublished here. Edge view uses a labeled nominal slot envelope.');
-    if(model.installation_layout) $('notes').textContent+=' Chassis reference: up to two full-height modules, shown with the supplied three-slot spacing. Afterburner omitted; this visual spacing is not a measured thickness.';
+    if(model.installation_layout) $('notes').textContent+=' Chassis reference: up to two full-height modules, shown filling the two reserved MPX bays. Afterburner omitted; this visual spacing is not a measured thickness.';
     if(model.visual_profile_note) $('notes').textContent+=' '+model.visual_profile_note;
     const specs=[['Length',model.length_mm,'mm'],['Board height',model.height_mm,'mm'],['Cooler thickness',model.thickness_mm,'mm'],['Published slots',model.slots,'']];
     $('specs').replaceChildren(...specs.map(([name,value,unit])=>{ const d=document.createElement('div');d.className='spec';const s=document.createElement('small');s.textContent=name;const n=document.createElement('strong');n.textContent=value==null?'Not published':`${Number(value.toFixed(2))} ${unit}`;d.append(s,n);return d;}));

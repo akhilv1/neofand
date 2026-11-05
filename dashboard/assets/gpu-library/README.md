@@ -27,3 +27,6 @@ Run `python3 build.py` (Python 3.9+ with Pillow) to regenerate metadata, the car
 Run `node --test builder/fit.test.mjs` for meaningful collision cases: mixed widths, double/single-wide connector spacing, 3-slot overlap, I/O reservation, bay over-length, MPX pairs, measured overrides and extra gap. UI verification should cover mixed OEM layouts, visible red collisions, restored clearances, the two-MPX limit, export/import, persistence and narrow screens.
 
 The builder saves layouts in the current browser under `neofand-gpu-layout-v1`. JSON imports accept catalog model IDs, slots 1–7, and bounded numeric controls and measured overrides; files are limited to 100 KB / 24 cards. Layouts are not uploaded to the server.
+
+
+NVIDIA workstation installed views now share the user-requested A6000 photographic base with crisp per-model shroud lettering. Generation and variant suffixes remain in the picker but are omitted from the artwork. These are shared visual-family previews scaled to each catalog envelope, not separate mechanical replicas. Full-height MPX artwork fills its reserved bay to match the supplied two-module reference. Both add controls disable when no valid connector placement remains.

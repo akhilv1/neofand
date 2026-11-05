@@ -1,4 +1,4 @@
-import {SLOTS,assess,firstFreeSlot,nearestConnector,checkMove} from './fit.mjs?v=drag1';
+import {SLOTS,assess,firstFreeSlot,nearestConnector,checkMove} from './fit.mjs?v=mpx2';
 const $=id=>document.getElementById(id);
 const ANCHOR=79.66, PHOTO_PITCH=3.59;
 let models=[],items=[],lastModel=decodeURIComponent(location.hash.slice(1))||'rtx-a6000';
@@ -85,14 +85,35 @@ function render(){
  draggable(n,c);const img=node('img');img.draggable=false;img.src=c.model.installed_asset||`models/${c.model.id}-installed.svg`;img.alt=`${c.model.name} installed in slot ${c.item.slot}`;
  if(c.model.raster_crop){const crop=node('div','builder-raster-crop'),r=c.model.raster_crop,[x,y,x2,y2]=r.box,w=x2-x,h=y2-y;img.className='builder-raster';img.style.width=`${r.image_width/w*100}%`;img.style.height=`${r.image_height/h*100}%`;img.style.left=`${-x/w*100}%`;img.style.top=`${-y/h*100}%`;crop.append(img);n.append(crop);}else n.append(img);
  n.append(node('span','builder-card-name',`${c.model.name} · ${c.item.slot}`));holder.append(n);}
- tableSpacing(result);save();
+ tableSpacing(result);save();updateAddAvailability();
 }
-$('build-add').addEventListener('click',()=>{if(items.length>=24)return;const m=models.find(m=>m.id===$('build-model').value);if(!m)return;if(m.category==='Apple MPX'&&items.filter(i=>models.find(x=>x.id===i.model)?.category==='Apple MPX').length>=2){$('builder-message').textContent='Both MPX bays are occupied. Remove a module before adding another.';return;}const slot=firstFreeSlot(m,items,models,options());items.push({id:crypto.randomUUID(),model:m.id,slot:slot??(m.category==='Apple MPX'?1:1)});$('builder-message').textContent=slot?'Placed in the next available connector.':'Placed for inspection; this layout needs attention.';render();});
+function addAvailability(id){
+ const model=models.find(m=>m.id===id);
+ const slot=model&&items.length<24?firstFreeSlot(model,items,models,options()):null;
+ const reason=!model?'Choose a card.':slot!==null?'':model.length_mm>options().bay_mm?`${model.name} is longer than the ${options().bay_mm} mm bay.`:model.category==='Apple MPX'?'No free MPX bay has enough room. Remove a card or module first.':'No free connector has enough space for this card. Remove or reposition a card first.';
+ return {model,slot,reason};
+}
+function updateAddAvailability(){
+ const available=addAvailability($('build-model').value);
+ $('build-add').disabled=available.slot===null;
+ $('build-add').title=available.reason;
+ $('build-availability').textContent=available.reason;
+ const library=addAvailability(lastModel);
+ $('add-selected').disabled=library.slot===null;
+ $('add-selected').title=library.reason;
+}
+$('build-model').addEventListener('change',updateAddAvailability);
+$('build-add').addEventListener('click',()=>{
+ const {model,slot,reason}=addAvailability($('build-model').value);
+ if(slot===null){$('builder-message').textContent=reason;updateAddAvailability();return;}
+ items.push({id:crypto.randomUUID(),model:model.id,slot});
+ $('builder-message').textContent='Placed in the next available connector.';render();
+});
 for(const id of ['build-bay','build-pitch','build-gap','build-io'])$(id).addEventListener('change',render);
 $('build-clear').addEventListener('click',()=>{items=[];render();});
 $('build-export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:1,items,options:options()},null,2)],{type:'application/json'});const a=node('a');a.href=URL.createObjectURL(blob);a.download='macpro-gpu-layout.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
 $('build-import').addEventListener('click',()=>$('build-import-file').click());
 $('build-import-file').addEventListener('change',async e=>{try{const f=e.target.files[0];if(!f)return;if(f.size>100000)throw new Error('Layout file is too large');load(JSON.parse(await f.text()));render();$('builder-message').textContent='Layout imported.';}catch(error){$('builder-message').textContent=error.message;}e.target.value='';});
-window.addEventListener('neofand-add-to-build',e=>{if(models.some(m=>m.id===e.detail.id)){$('build-model').value=e.detail.id;$('build-add').click();}});
-window.addEventListener('neofand-model-selected',e=>{lastModel=e.detail.id;if(models.length)$('build-model').value=lastModel;});
+window.addEventListener('neofand-add-to-build',e=>{if(models.some(m=>m.id===e.detail.id)){$('build-model').value=e.detail.id;updateAddAvailability();$('build-add').click();}});
+window.addEventListener('neofand-model-selected',e=>{lastModel=e.detail.id;if(models.length){$('build-model').value=lastModel;updateAddAvailability();}});
 fetch('catalog.json').then(r=>{if(!r.ok)throw new Error('Catalog unavailable');return r.json();}).then(d=>{models=d.models;const select=$('build-model');select.replaceChildren(...models.map(m=>{const o=node('option',null,`${m.name} · ${m.variant}`);o.value=m.id;return o;}));select.value=models.some(m=>m.id===lastModel)?lastModel:'rtx-a6000';try{const saved=JSON.parse(localStorage.getItem(storage)||'null');if(saved)load(saved);}catch(_){}render();}).catch(e=>{$('build-status').textContent=e.message;});

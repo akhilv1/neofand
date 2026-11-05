@@ -53,9 +53,9 @@ All lengths and widths below are millimeters. A slot count is not a measured coo
 | Radeon Pro 580X · Half-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 40.64 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
 | Radeon Pro W5500X · Half-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 40.64 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
 | Radeon Pro W6600X · Half-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 40.64 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro W5700X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro Vega II · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro Vega II Duo · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro W6800X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro W6800X Duo · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
-| Radeon Pro W6900X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 60.96 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro W5700X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro Vega II · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro Vega II Duo · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro W6800X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro W6800X Duo · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |
+| Radeon Pro W6900X · Full-height MPX module | Unpublished | Unpublished | Unpublished | Unpublished | 81.28 (estimate) | [Manufacturer](https://support.apple.com/en-us/111907) |

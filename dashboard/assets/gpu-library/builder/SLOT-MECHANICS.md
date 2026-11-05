@@ -37,7 +37,7 @@ Examples: two two-slot cards fit at connectors 1 and 2 with no extra gap. A thre
 
 ## MPX
 
-Apple permits MPX modules in connector pairs 1–2 and 3–4. Each module reserves the complete pair (4 nominal bracket pitches = 81.28 mm), even if its visible body is thinner. The builder admits at most two MPX modules and only offers bay A / connector 1 or bay B / connector 3. The user supplied a three-slot full-height body reference; that is a visual estimate, not a published thickness. Full-height and half-height MPX body dimensions remain uncalibrated until measured. Reserving the whole bay prevents another card from being placed in a connector consumed by MPX.
+Apple permits MPX modules in connector pairs 1–2 and 3–4. Each module reserves the complete pair (4 nominal bracket pitches = 81.28 mm), independently of its visible body. The builder admits at most two MPX modules and only offers bay A / connector 1 or bay B / connector 3. The full-height artwork fills the reserved bay (four nominal pitches) to match the user's two-module photograph. This is a visual envelope estimate, not a published cooler thickness. Full-height and half-height MPX body dimensions remain uncalibrated until measured. Reserving the whole bay prevents another card from being placed in a connector consumed by MPX.
 
 ## Rendering and clipping
 

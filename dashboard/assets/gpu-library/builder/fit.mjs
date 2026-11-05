@@ -13,7 +13,7 @@ export function dimensions(model,item={},pitch=PITCH) {
   const manualLength=validNumber(item.length_mm), manualThickness=validNumber(item.thickness_mm);
   const mpx=model.category==='Apple MPX';
   const length=manualLength?Number(item.length_mm):model.length_mm??305;
-  const thickness=manualThickness?Number(item.thickness_mm):model.thickness_mm??(mpx?(model.module_class==='full'?3:2)*pitch:(model.slots??2)*pitch);
+  const thickness=manualThickness?Number(item.thickness_mm):model.thickness_mm??(mpx?(model.module_class==='full'?4:2)*pitch:(model.slots??2)*pitch);
   const lengthKnown=manualLength||Number.isFinite(model.length_mm);
   const thicknessKnown=manualThickness||Number.isFinite(model.thickness_mm);
   const bracket=mpx?0:(model.slots??0)*pitch;

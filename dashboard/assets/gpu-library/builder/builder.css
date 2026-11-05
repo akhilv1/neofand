@@ -7,3 +7,5 @@
 
 /* Pointer capture keeps touch, pen and mouse placement on the physical slot grid. */
 .builder-card{pointer-events:auto;cursor:grab;touch-action:none;user-select:none}.builder-card img{pointer-events:none}.builder-card:focus-visible{outline:3px solid #378bba;outline-offset:3px}.builder-card.dragging{cursor:grabbing;z-index:5;opacity:.85}.builder-card[data-drop=allowed]{outline:3px solid #259872}.builder-card[data-drop=blocked]{outline:3px solid #d05c40}.is-dragging .chassis-slot{left:25%;width:73%;border-bottom:1px dashed #56836b88}.is-dragging .chassis-slot[data-target=true]{border-bottom:2px solid #2e9f7e}.is-dragging .chassis-slot[data-target=true] span{background:#d5f6e5;color:#174d3a}
+
+.add-card-button:disabled{opacity:.45;cursor:not-allowed}#build-availability:empty{display:none}#build-availability{color:#945c35}

@@ -16,7 +16,7 @@ test('three-slot slot5 covers single-wide slots6 and7',()=>assert.equal(assess([
 test('rounding 60.96 to61 does not falsely collide with IO',()=>assert.equal(assess([c('a','three',5)],models).hasErrors,false));
 test('slot7 dual card collides with reservedIO',()=>assert.match(assess([c('a','two',7)],models).cards[0].errors.join(),/I\/O/));
 test('long card exceeds305mm bay',()=>assert.match(assess([c('a','long',1)],models).cards[0].errors.join(),/8.0 mm/));
-test('MPX reserves slots1and2 even with three-slot visualbody',()=>assert.equal(assess([c('a','mpx',1),c('b','two',2)],models).pairs.length,1));
+test('MPX reserves slots1and2 independently of visual artwork',()=>assert.equal(assess([c('a','mpx',1),c('b','two',2)],models).pairs.length,1));
 test('two MPX bays allowed; invalid start rejected',()=>{assert.equal(assess([c('a','mpx',1),c('b','mpx',3)],models).hasErrors,false);assert.equal(assess([c('a','mpx',2)],models).hasErrors,true);});
 test('unpublished width remains uncertain until measured',()=>{assert.equal(dimensions(models[2]).estimated,true);assert.equal(dimensions(models[2],{thickness_mm:41}).estimated,false);});
 test('auto placement skips collision',()=>assert.equal(firstFreeSlot(models[0],[c('a','three',1)],models),3));
@@ -29,3 +29,9 @@ test('drag snapping respects double then single connector pitches',()=>{assert.e
 test('MPX snaps only to its two bays',()=>{assert.equal(nearestConnector(1.9,true),1);assert.equal(nearestConnector(2.1,true),3);assert.equal(nearestConnector(11,true),3);});
 test('move validates destination without mutating original slot',()=>{const items=[c('a','three',1),c('b','two',3)];assert.ok(checkMove(items[0],2,items,models).errors.length);assert.equal(items[0].slot,1);assert.equal(checkMove(items[0],5,items,models).errors.length,0);});
 test('moving a card ignores its previous occupancy but blocks reserved IO',()=>{const item=c('a','two',1);assert.equal(checkMove(item,2,[item],models).errors.length,0);assert.ok(checkMove(item,7,[item],models).errors.length);});
+
+test('no connector is offered when all usable width is occupied',()=>{const filled=[c('a','two',1),c('b','two',2),c('c','two',3),c('d','two',4),c('e','three',5)];assert.equal(firstFreeSlot(models[0],filled,models),null);});
+test('over-length cards cannot be added even to an empty chassis',()=>assert.equal(firstFreeSlot(models[3],[],models),null));
+test('two MPX modules leave no third MPX placement',()=>assert.equal(firstFreeSlot(models[4],[c('a','mpx',1),c('b','mpx',3)],models),null));
+
+test('full MPX artwork fills its reserved bay without changing connector occupancy',()=>{const env=assess([c('a','mpx',1)],models).cards[0].env;assert.equal(env.thickness,4*PITCH);assert.equal(env.width,4*PITCH);assert.equal(env.estimated,true);});

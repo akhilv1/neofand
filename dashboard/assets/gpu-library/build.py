@@ -1,5 +1,7 @@
 """Generate dimension-driven 2D GPU envelopes from manufacturer specifications."""
 import json
+import base64
+import re
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -83,7 +85,7 @@ for id,name,kind in [
         MODELS[-1]['chassis_reference'] = 'macpro-dual-mpx-v1.png'
         MODELS[-1]['installation_layout'] = {
             'mount': 'Mac Pro 7,1 MPX bay', 'max_modules': 2,
-            'visual_slot_span': 3, 'slot_span_basis': 'user-provided chassis reference',
+            'visual_slot_span': 4, 'slot_span_basis': 'full MPX bay silhouette from user-provided chassis reference; not a published thickness',
             'exclude_afterburner': True,
         }
 VISUAL_PROFILES = [
@@ -116,6 +118,8 @@ from appearance import FAMILIES, LABELS, draw
 from PIL import Image
 RASTER_MAP = {
  'rtx-a6000':'rtx-a6000.png',
+ 'rtx-6000-ada':'rtx-6000-ada.png',
+ 'rtx-pro-6000-maxq':'rtx-pro-6000-maxq.png',
  'rtx-pro-6000-workstation':'rtx-pro6000-workstation.png',
  'rtx-3080-fe':'geforce-clean.png','rtx-3090-fe':'geforce-clean.png','rtx-3090ti-fe':'geforce-clean.png',
  'rtx-4080-fe':'geforce-clean.png','rtx-4080s-fe':'geforce-clean.png','rtx-4090-fe':'geforce-clean.png',
@@ -131,14 +135,26 @@ def geometry(model, edge=False):
     length=model['length_mm'] or 305
     known=model['thickness_mm'] if edge else model['height_mm']
     if edge:
-        height=known or ((3 if model.get('module_class')=='full' else 2)*20.32 if model['category']=='Apple MPX' else (model['slots'] or 2)*20.32)
+        height=known or ((4 if model.get('module_class')=='full' else 2)*20.32 if model['category']=='Apple MPX' else (model['slots'] or 2)*20.32)
     else:
         height=known or (145 if model['category']=='Apple MPX' else 111.76)
     return length,height
 
+def workstation_photo(model,length,height):
+    image=Image.open(ROOT/'artwork/workstation-photo-base.png')
+    x,y,x2,y2=image.getchannel('A').point(lambda a:255 if a>=128 else 0).getbbox()
+    x2-=round((x2-x)*.047)
+    bw,bh=x2-x,y2-y
+    data=base64.b64encode((ROOT/'artwork/workstation-photo-base.png').read_bytes()).decode()
+    label=model['name']
+    for suffix in [' Ada',' Blackwell',' Max-Q',' Workstation',' SFF',' 12GB']:
+        label=label.replace(suffix,'')
+    label=label.replace('Quadro ','')
+    return f'<svg width="{length}" height="{height}" viewBox="0 0 {length} {height}" overflow="hidden"><image href="data:image/png;base64,{data}" x="{-x/bw*length}" y="{-y/bh*height}" width="{image.width/bw*length}" height="{image.height/bh*height}" preserveAspectRatio="none"/><text x="{length*.975}" y="{height*.39}" text-anchor="end" fill="#d0c7b7" font-family="Arial,sans-serif" font-weight="600" font-size="{height*.073}">{escape(label)}</text></svg>'
+
 def svg(model,edge=False,installed=False):
     length,height=geometry(model,edge)
-    body=draw(model,length,height,edge)
+    body=workstation_photo(model,length,height) if edge and model.get("workstation_photo") else draw(model,length,height,edge)
     title=escape(model['name'])
     if installed:
         return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {length} {height}" role="img" aria-label="{title} installed side">{body}</svg>'
@@ -149,23 +165,28 @@ def svg(model,edge=False,installed=False):
 
 (ROOT/'models').mkdir(parents=True,exist_ok=True)
 for model in MODELS:
+    model["workstation_photo"]=model["vendor"]=="NVIDIA" and model["category"]=="Workstation"
     assert model['id'] in FAMILIES, f"Appearance required: {model['id']}"
     model['artwork_family']=FAMILIES[model['id']]
     model['artwork_description']=LABELS[model['artwork_family']]
     model['installed_asset']=f'models/{model["id"]}-installed.svg'
     model['appearance_source']=model['source']
     model['artwork_status']='family-specific illustration'
-    if model['id'] in RASTER_MAP:
+    if model['id'] in RASTER_MAP and not model['workstation_photo']:
         asset='artwork/'+RASTER_MAP[model['id']]
         image=Image.open(ROOT/asset)
         box=image.getchannel('A').point(lambda alpha:255 if alpha>=128 else 0).getbbox() if 'A' in image.getbands() else (0,0,*image.size)
         # Ignore near-transparent edge noise, and keep the A6000 mounting tab behind the rail.
-        if RASTER_MAP[model['id']]=='rtx-a6000.png': box=(box[0],box[1],box[2]-round((box[2]-box[0])*.047),box[3])
+        if model['id'] in {'rtx-a6000','rtx-6000-ada','rtx-pro-6000-maxq'}: box=(box[0],box[1],box[2]-round((box[2]-box[0])*.047),box[3])
         model['installed_asset']=asset
         model['raster_crop']={'image_width':image.width,'image_height':image.height,'box':box}
         model['artwork_status']='rendered family profile'
         model['render_preview']=asset
         model['render_preview_label']='Clean installed render ↗'
+    if model['workstation_photo']:
+        model['artwork_status']='A6000-based photographic family with model lettering'
+        model['render_preview']=model['installed_asset']
+        model['render_preview_label']='Photorealistic installed view ↗'
     for view in ['face','edge']:
         (ROOT/'models'/f'{model["id"]}-{view}.svg').write_text(svg(model,view=='edge'))
     (ROOT/'models'/f'{model["id"]}-installed.svg').write_text(svg(model,True,True))

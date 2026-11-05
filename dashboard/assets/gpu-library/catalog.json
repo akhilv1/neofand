@@ -42,11 +42,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-compact",
       "artwork_description": "NVIDIA Ampere compact blower",
       "installed_asset": "models/rtx-a2000-12-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a2000-12-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-a4000",
@@ -64,11 +67,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-single",
       "artwork_description": "NVIDIA Ampere single-slot blower",
       "installed_asset": "models/rtx-a4000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a4000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-a4500",
@@ -86,11 +92,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-gold",
       "artwork_description": "NVIDIA Ampere black / gold blower",
       "installed_asset": "models/rtx-a4500-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a4500-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-a5000",
@@ -108,11 +117,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-gold",
       "artwork_description": "NVIDIA Ampere black / gold blower",
       "installed_asset": "models/rtx-a5000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a5000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-a5500",
@@ -130,11 +142,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-gold",
       "artwork_description": "NVIDIA Ampere black / gold blower",
       "installed_asset": "models/rtx-a5500-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a5500-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-a6000",
@@ -152,23 +167,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ampere-gold",
       "artwork_description": "NVIDIA Ampere black / gold blower",
-      "installed_asset": "artwork/rtx-a6000.png",
+      "installed_asset": "models/rtx-a6000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "rendered family profile",
-      "raster_crop": {
-        "image_width": 2172,
-        "image_height": 724,
-        "box": [
-          57,
-          163,
-          2058,
-          547
-        ]
-      },
-      "render_preview": "artwork/rtx-a6000.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-a6000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-2000-ada",
@@ -186,11 +192,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-compact",
       "artwork_description": "NVIDIA Ada low-profile blower",
       "installed_asset": "models/rtx-2000-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-2000-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-4000-sff-ada",
@@ -208,11 +217,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-compact",
       "artwork_description": "NVIDIA Ada low-profile blower",
       "installed_asset": "models/rtx-4000-sff-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-4000-sff-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-4000-ada",
@@ -230,11 +242,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-single",
       "artwork_description": "NVIDIA Ada single-slot blower",
       "installed_asset": "models/rtx-4000-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-4000-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-4500-ada",
@@ -252,11 +267,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-gold",
       "artwork_description": "NVIDIA Ada workstation blower",
       "installed_asset": "models/rtx-4500-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-4500-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-5000-ada",
@@ -274,11 +292,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-gold",
       "artwork_description": "NVIDIA Ada workstation blower",
       "installed_asset": "models/rtx-5000-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-5000-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-6000-ada",
@@ -296,11 +317,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "ada-gold",
       "artwork_description": "NVIDIA Ada workstation blower",
       "installed_asset": "models/rtx-6000-ada-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-6000-ada-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-2000-blackwell",
@@ -318,11 +342,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-compact",
       "artwork_description": "NVIDIA Blackwell compact blower",
       "installed_asset": "models/rtx-pro-2000-blackwell-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-2000-blackwell-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-4000-sff-blackwell",
@@ -340,11 +367,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-compact",
       "artwork_description": "NVIDIA Blackwell compact blower",
       "installed_asset": "models/rtx-pro-4000-sff-blackwell-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-4000-sff-blackwell-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-4000-blackwell",
@@ -362,11 +392,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-single",
       "artwork_description": "NVIDIA Blackwell single-slot blower",
       "installed_asset": "models/rtx-pro-4000-blackwell-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-4000-blackwell-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-4500-blackwell",
@@ -384,11 +417,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-blower",
       "artwork_description": "NVIDIA Blackwell workstation blower",
       "installed_asset": "models/rtx-pro-4500-blackwell-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-4500-blackwell-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-5000-blackwell",
@@ -406,11 +442,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-blower",
       "artwork_description": "NVIDIA Blackwell workstation blower",
       "installed_asset": "models/rtx-pro-5000-blackwell-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-5000-blackwell-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-6000-maxq",
@@ -428,11 +467,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-blower",
       "artwork_description": "NVIDIA Blackwell workstation blower",
       "installed_asset": "models/rtx-pro-6000-maxq-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-6000-maxq-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-pro-6000-workstation",
@@ -450,23 +492,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "blackwell-flow",
       "artwork_description": "NVIDIA Blackwell double flow-through",
-      "installed_asset": "artwork/rtx-pro6000-workstation.png",
+      "installed_asset": "models/rtx-pro-6000-workstation-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
-      "artwork_status": "rendered family profile",
-      "raster_crop": {
-        "image_width": 2172,
-        "image_height": 724,
-        "box": [
-          53,
-          199,
-          2120,
-          515
-        ]
-      },
-      "render_preview": "artwork/rtx-pro6000-workstation.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/rtx-pro-6000-workstation-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "quadro-p6000",
@@ -484,11 +517,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "quadro-silver",
       "artwork_description": "Quadro Pascal silver / green",
       "installed_asset": "models/quadro-p6000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/quadro-p6000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "quadro-rtx-5000",
@@ -506,11 +542,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "quadro-green",
       "artwork_description": "Quadro RTX black / green",
       "installed_asset": "models/quadro-rtx-5000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/quadro-rtx-5000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "quadro-rtx-6000",
@@ -528,11 +567,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "quadro-green",
       "artwork_description": "Quadro RTX black / green",
       "installed_asset": "models/quadro-rtx-6000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/quadro-rtx-6000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "quadro-rtx-8000",
@@ -550,11 +592,14 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": true,
       "artwork_family": "quadro-green",
       "artwork_description": "Quadro RTX black / green",
       "installed_asset": "models/quadro-rtx-8000-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "A6000-based photographic family with model lettering",
+      "render_preview": "models/quadro-rtx-8000-installed.svg",
+      "render_preview_label": "Photorealistic installed view \u2197"
     },
     {
       "id": "rtx-3080-fe",
@@ -576,6 +621,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ampere",
       "artwork_description": "GeForce Ampere Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -612,6 +658,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ampere",
       "artwork_description": "GeForce Ampere Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -648,6 +695,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ampere",
       "artwork_description": "GeForce Ampere Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -684,6 +732,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ada",
       "artwork_description": "GeForce Ada Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -720,6 +769,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ada",
       "artwork_description": "GeForce Ada Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -756,6 +806,7 @@
       "render_preview_label": "Clean installed render \u2197",
       "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-ada",
       "artwork_description": "GeForce Ada Founders Edition",
       "installed_asset": "artwork/geforce-clean.png",
@@ -788,6 +839,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-blackwell",
       "artwork_description": "GeForce Blackwell Founders Edition",
       "installed_asset": "artwork/geforce-blackwell.png",
@@ -822,6 +874,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "fe-blackwell",
       "artwork_description": "GeForce Blackwell Founders Edition",
       "installed_asset": "artwork/geforce-blackwell.png",
@@ -856,6 +909,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "tesla-pascal",
       "artwork_description": "Tesla Pascal passive",
       "installed_asset": "models/tesla-p40-installed.svg",
@@ -878,6 +932,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "tesla-pascal",
       "artwork_description": "Tesla Pascal passive",
       "installed_asset": "models/tesla-p100-pcie-installed.svg",
@@ -900,6 +955,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "tesla-volta",
       "artwork_description": "Tesla Volta passive",
       "installed_asset": "models/tesla-v100-pcie-installed.svg",
@@ -922,6 +978,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "datacenter-ampere",
       "artwork_description": "A100 passive enclosure",
       "installed_asset": "models/a100-80-pcie-installed.svg",
@@ -944,6 +1001,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "datacenter-hopper",
       "artwork_description": "H100 passive enclosure",
       "installed_asset": "models/h100-pcie-installed.svg",
@@ -966,6 +1024,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "datacenter-low",
       "artwork_description": "L4 low-profile passive",
       "installed_asset": "models/l4-installed.svg",
@@ -988,6 +1047,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "datacenter-ada",
       "artwork_description": "L40S passive",
       "installed_asset": "models/l40s-installed.svg",
@@ -1010,6 +1070,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "radeon-rdna3",
       "artwork_description": "AMD RDNA 3 reference triple-fan",
       "installed_asset": "artwork/radeon-rx7900.png",
@@ -1044,6 +1105,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "radeon-rdna3",
       "artwork_description": "AMD RDNA 3 reference triple-fan",
       "installed_asset": "artwork/radeon-rx7900.png",
@@ -1078,6 +1140,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "radeon-pro-blue",
       "artwork_description": "Radeon PRO blue blower",
       "installed_asset": "models/radeon-pro-w6800-installed.svg",
@@ -1100,6 +1163,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "radeon-pro-black",
       "artwork_description": "Radeon PRO W7000 dark blower",
       "installed_asset": "artwork/radeon-pro-w7800.png",
@@ -1134,6 +1198,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "radeon-pro-black",
       "artwork_description": "Radeon PRO W7000 dark blower",
       "installed_asset": "models/radeon-pro-w7900-dual-installed.svg",
@@ -1156,6 +1221,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "instinct",
       "artwork_description": "AMD Instinct passive",
       "installed_asset": "models/instinct-mi210-installed.svg",
@@ -1178,6 +1244,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "arc-alchemist",
       "artwork_description": "Intel Arc A770 Limited Edition",
       "installed_asset": "artwork/arc-a770.png",
@@ -1212,6 +1279,7 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "arc-battlemage",
       "artwork_description": "Intel Arc B580 Limited Edition",
       "installed_asset": "artwork/arc-b580.png",
@@ -1247,6 +1315,7 @@
       "dimensional_status": "body dimensions not published",
       "module_class": "half",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-half",
       "artwork_description": "Apple half-height MPX",
       "installed_asset": "models/mpx-580x-installed.svg",
@@ -1270,6 +1339,7 @@
       "dimensional_status": "body dimensions not published",
       "module_class": "half",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-half",
       "artwork_description": "Apple half-height MPX",
       "installed_asset": "models/mpx-w5500x-installed.svg",
@@ -1293,6 +1363,7 @@
       "dimensional_status": "body dimensions not published",
       "module_class": "half",
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-half",
       "artwork_description": "Apple half-height MPX",
       "installed_asset": "models/mpx-w6600x-installed.svg",
@@ -1319,11 +1390,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-w5700x-installed.svg",
@@ -1350,11 +1422,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-vega-ii-installed.svg",
@@ -1381,11 +1454,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-vega-ii-duo-installed.svg",
@@ -1412,11 +1486,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-w6800x-installed.svg",
@@ -1443,11 +1518,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-w6800x-duo-installed.svg",
@@ -1474,11 +1550,12 @@
       "installation_layout": {
         "mount": "Mac Pro 7,1 MPX bay",
         "max_modules": 2,
-        "visual_slot_span": 3,
-        "slot_span_basis": "user-provided chassis reference",
+        "visual_slot_span": 4,
+        "slot_span_basis": "full MPX bay silhouette from user-provided chassis reference; not a published thickness",
         "exclude_afterburner": true
       },
       "board_origin": "OEM / reference",
+      "workstation_photo": false,
       "artwork_family": "mpx-full",
       "artwork_description": "Apple full-height MPX",
       "installed_asset": "models/mpx-w6900x-installed.svg",
