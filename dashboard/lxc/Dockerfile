@@ -12,6 +12,7 @@ COPY linux_api.py /opt/neofand/linux_api.py
 COPY Caddyfile /etc/neofand/Caddyfile
 COPY neofand-*.service /etc/systemd/system/
 COPY README.md /opt/neofand/LXC-README.md
+COPY SECURITY.md /opt/neofand/SECURITY.md
 RUN mkdir -p /etc/neofand/access /var/lib/neofand/telemetry && chmod 755 /var/lib/neofand /var/lib/neofand/telemetry && \
     chown -R neofand:neofand /var/lib/neofand && \
     systemctl disable ssh.service ssh.socket postfix.service && \
