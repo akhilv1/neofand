@@ -22,7 +22,7 @@ a=html.index('function renderSummary()');b=html.index('\nlet eventRequest=',a)
 html=html[:a]+'''function renderSummary() {
  const val=(s,n)=>latestOf(s,n), f=(v,u)=>v==null?'Unavailable':v.toFixed(1)+' '+u;
  const info=window.neofandHostInfo||{},host=info.host||{},gpu=info.gpus?.[0];
- const rows=[['Platform',host.product_family||host.product_version||'Connecting'],['CPU',host.cpu||'Unavailable'],
+ const rows=[['Platform',host.display_name||host.product_family||host.product_version||'Connecting'],['CPU',host.cpu||'Unavailable'],
  ['CPU load',f(val('host','cpu_pct'),'%')],['Memory in use',f(val('host','mem_used_pct'),'%')],
  ['GPU',gpu?.name||'Unavailable'],['GPU board power',f(val('gpu','gpu0_power_w'),'W')],
  ['GPU temperature',f(val('gpu','gpu0_temp_c'),'°C')],['Total PSU power / chassis fans','Not exposed by the host']];
@@ -45,7 +45,7 @@ const historyNote=el('div','p620-history','Collecting history on this host…');
 $('tab-overview').prepend(historyNote);
 getJSON('/hardware/api/host-info').then(d=>{
  window.neofandHostInfo=d;
- $('hostline').textContent=(d.host.product_family||d.host.product_version||'Linux')+' · '+d.host.hostname;
+ $('hostline').textContent=(d.host.display_name||d.host.product_family||d.host.product_version||'Linux')+' · '+d.host.hostname;
  window.neofandHostConnected?.(d);renderSummary();
  historyNote.textContent='History starts '+fmtTime(d.history_since)+'. Live samples every 2 seconds; chart history every 30 seconds.';
 }).catch(()=>historyNote.textContent='History metadata unavailable.');
@@ -58,6 +58,13 @@ html=html.replace('Every fan as a percentage of its own ceiling, so chassis RPM 
 html=html.replace('name: "CPU package", points: x.points','name: "CPU " + x.name.split("_").pop(), points: x.points')
 html=html.replace('See what’s using each drive. Categories estimate Models, Photos, Backups and more from filenames and folders. Expand a category to see its largest contributors.','Physical drives, ZFS pools and mounted filesystem usage on cheese.')
 html=html.replace('The metadata index reconciles about every 30 minutes; cached categories remain visible during updates. Space totals refresh separately.','File category indexing is not enabled on this host. Space totals refresh separately.')
+html=html.replace('<div class="grp">Monitoring</div>','<div class="grp">Monitoring</div><a data-tab="proxmox">Proxmox</a>')
+html=html.replace('<div id="tab-storage" hidden>','<div id="tab-proxmox" class="grid" hidden><section class="card wide"><h2>Proxmox</h2><div class="body"><p id="proxmox-status">Loading host inventory…</p><p class="sub">Read-only node, VM/container status and recent tasks. Guest controls are managed in Proxmox.</p><div class="tw" id="proxmox-resources"></div></div></section></div><div id="tab-storage" hidden>')
+html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors"];','const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "proxmox"];')
+html=html.replace('else if (state.tab === "errors") await loadEvents();','else if (state.tab === "proxmox") await window.neofandProxmoxRefresh();\n    else if (state.tab === "errors") await loadEvents();')
+html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => Boolean(window.neofandHostInfo?.proxmox_available),")
+html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();')
+html=html.replace('</head>','<script src="/hardware/assets/proxmox.js" defer></script></head>')
 output.write_text(html)
 
 # Default the GPU builder to this host's platform; saved layouts still take precedence.

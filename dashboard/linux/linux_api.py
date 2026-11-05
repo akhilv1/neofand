@@ -37,6 +37,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/series': data=series(parse_qs(url.query),DATA/'linux.sqlite')
             elif path=='/api/host-events':
                 data=json.loads((DATA/'system-events.json').read_text());data.pop('boot_evidence',None)
+            elif path=='/api/proxmox': data=json.loads((DATA/'proxmox.json').read_text())
             elif path=='/api/host-storage': data=json.loads((DATA/'storage.json').read_text())
             elif path=='/api/events': data={'events':[]}
             elif path in ('/api/latest','/api/metrics','/api/host-memory','/api/host-info','/health'):
@@ -47,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif path=='/health':
                     if time.time()-snap['timestamp']>30: self.send_error(503,'Host sampler stale');return
                     data={'status':'ok'}
-                else: data={k:v for k,v in snap.items() if k not in ('latest','memory')}
+                else: data={**{k:v for k,v in snap.items() if k not in ('latest','memory')},'proxmox_available':(DATA/'proxmox.json').exists()}
             else: self.send_error(404);return
             body=json.dumps(data,allow_nan=False).encode()
         except (OSError,sqlite3.Error): self.send_error(503,'Host telemetry unavailable');return

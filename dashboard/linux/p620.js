@@ -41,12 +41,12 @@
     chassis.addEventListener('load',scheduleConnectors);window.addEventListener('resize',scheduleConnectors);scheduleConnectors();
   }
   window.neofandHostConnected=info=>{
-    set('host-title',info.host.product_family||info.host.product_version||'Linux host');
+    set('host-title',info.host.display_name||info.host.product_family||info.host.product_version||'Linux host');
     set('host-detail',info.host.hostname+' · '+info.host.cpu);
     set('cpu-name','CPU');set('gpu-name',info.gpus?.[0]?.name||'GPU unavailable');
     const p620=info.host.platform==='lenovo-p620';
     document.querySelector('.p620-chassis').hidden=!p620;
-    overlay.hidden=!p620;
+    overlay.style.display=p620?'':'none';
     visual.style.gridTemplateColumns=p620?'':'1fr';scheduleConnectors();
   };
   let request=0;
