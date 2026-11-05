@@ -87,6 +87,7 @@
       for(const notice of data.notices||[])cards.unshift(make('p','storage-note storage-warning',notice));
       const expanded=new Set([...host.querySelectorAll('details[open]')].map(e=>e.dataset.storageKey));
       host.replaceChildren(...cards);
+      window.neofandDecorateStorage?.();
       host.querySelectorAll('details').forEach(e=>{e.open=expanded.has(e.dataset.storageKey);});
       if(!cards.length)host.append(make('p','','No physical drives detected.'));
       const summary=document.getElementById('storage-summary'); summary.replaceChildren();

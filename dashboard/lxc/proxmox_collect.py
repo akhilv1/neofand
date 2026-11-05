@@ -15,9 +15,10 @@ def query(path,*args):
 
 def guest_storage(guests):
     """Publish only guest-to-storage relationships, never raw VM config or args."""
-    uses=[]; pools={}; seen=set()
+    uses=[]; seen=set()
     for guest in guests:
         vmid=guest['vmid']; kind=guest['type']
+        if kind!='qemu':continue
         command=['qm' if kind=='qemu' else 'pct','config',str(vmid)]
         try:
             config=subprocess.run(command,capture_output=True,text=True,check=True,timeout=10).stdout
@@ -35,22 +36,13 @@ def guest_storage(guests):
         for source in dict.fromkeys(sources):
             if source.startswith('/dev/'):
                 target=str(Path(source).resolve())
-                # A partition passthrough belongs to its parent disk.
+                # Only a complete physical disk conveys disk ownership.
+                # Partitions, zvols and logical volumes must not claim their parent.
                 try:
-                    r=subprocess.run(['lsblk','-ndo','PKNAME',target],capture_output=True,text=True,timeout=3)
-                    parent=r.stdout.strip().splitlines()
-                    if parent and parent[0]:target='/dev/'+parent[0]
-                except OSError:pass
+                    r=subprocess.run(['lsblk','-ndo','TYPE',target],capture_output=True,text=True,check=True,timeout=3)
+                    if r.stdout.strip()!='disk':continue
+                except (OSError,subprocess.SubprocessError):continue
                 relation='passthrough'
-            elif ':' in source:
-                storage=source.split(':',1)[0]
-                if storage not in pools:
-                    try:
-                        info=query('/storage/'+storage)
-                        pools[storage]=info.get('pool','').split('/',1)[0] if info.get('type')=='zfspool' else None
-                    except (OSError,ValueError,subprocess.SubprocessError):pools[storage]=None
-                if not pools[storage]:continue
-                target=pools[storage];relation='virtual disk'
             else:
                 # Mounts and other virtual stores have no proven physical drive.
                 continue
@@ -58,7 +50,7 @@ def guest_storage(guests):
             if identity not in seen:
                 seen.add(identity)
                 uses.append(dict(target=target,vmid=vmid,name=guest.get('name') or str(vmid),
-                                 type=kind,status=guest.get('status'),relation=relation))
+                                 type=kind,status=guest.get('status'),relation=relation,whole_disk=True))
     return uses
 
 

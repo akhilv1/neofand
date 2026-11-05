@@ -17,19 +17,20 @@
  function badges(parent,uses){const box=element('div',undefined,'pve-storage-uses');for(const u of uses){const b=element('span',`${u.type==='qemu'?'VM':'LXC'} ${u.vmid} · ${u.name}${u.status==='stopped'?' (stopped)':''}`,'pve-owner-badge');b.title=u.relation==='passthrough'?(u.status==='running'?'Physical drive passed to running guest':'Physical passthrough configured for a stopped guest'):'Guest virtual disk on this shared pool';box.append(b)}if(uses.length)parent.append(box);}
  function decorateStorage(d){const tab=document.getElementById('tab-storage');if(!tab||!d)return;
   tab.classList.add('pve-storage');const cards=[...tab.querySelectorAll('#storage-drives > .storage-drive')];
-  for(const card of cards){for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge').forEach(n=>n.remove());
+  for(const card of cards){const wasOpen=Boolean(card.querySelector(':scope > .pve-detail-toggle[open]'));for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge').forEach(n=>n.remove());
    const title=card.querySelector(':scope > .storage-drive-heading, :scope > .storage-title-line');if(!title)continue;const ownerContainer=title.classList.contains('storage-drive-heading')?title.firstElementChild:title;
    const meta=title.querySelector('.storage-note')?.textContent||'';
    const device=meta.match(/\/dev\/[a-z0-9]+/)?.[0];
    const pool=card.id?.startsWith('storage-group-zfs%3A')?decodeURIComponent(card.id.slice('storage-group-'.length)).replace(/^zfs:/,''):null;
-   const uses=(d.storage_uses||[]).filter(u=>u.target===(pool||device));
+   const uses=(d.storage_uses||[]).filter(u=>!pool && u.target===device && u.type==='qemu' && u.relation==='passthrough' && u.whole_disk===true);
+   if(pool==='rpool')title.querySelector('h3').textContent='PVE Boot Disk';
    if(card.id && !pool && meta.includes('backing drives:') && uses.some(u=>u.relation==='passthrough')){card.style.display='none';continue}
    badges(ownerContainer,uses);
-   if(device&&!uses.length&&!pool){const shared=card.querySelector('.storage-membership')?.textContent;const hint=element('span',shared?'Shared · '+shared:'Host / unassigned','pve-host-badge');ownerContainer.append(hint)}
+   if(device&&!uses.length&&!pool){const shared=card.querySelector('.storage-membership')?.textContent;const hint=element('span',shared==='rpool'?'PVE Boot Disk':shared?'Shared · '+shared:'Host / unassigned','pve-host-badge');ownerContainer.append(hint)}
    const children=[...card.children].filter(n=>n!==title);
-   if(children.length){const detail=element('details',undefined,'pve-detail-toggle');detail.dataset.storageKey=card.id||device||pool||'';detail.append(element('summary','Partitions, datasets & usage'),...children);card.append(detail)}
+   if(children.length){const detail=element('details',undefined,'pve-detail-toggle');detail.dataset.storageKey=card.id||device||pool||'';detail.open=wasOpen;detail.append(element('summary','Partitions, datasets & usage'),...children);card.append(detail)}
   }
-  const note=tab.querySelector('.storage-intro > .storage-note:last-child');if(note)note.textContent='Direct passthrough badges identify guests with physical device access. Pool badges identify guests with virtual disks on shared ZFS storage. Usage inside a guest is not visible to this host.';
+  const note=tab.querySelector('.storage-intro > .storage-note:last-child');if(note)note.textContent='VM ownership badges are shown only for whole physical disks configured for passthrough. PVE Boot Disk is the host boot pool. Usage inside a guest is not visible to this host.';
  }
  window.neofandProxmoxRefresh=async()=>{
   const target=document.getElementById('proxmox-resources'),stamp=document.getElementById('proxmox-status');
@@ -42,7 +43,6 @@
    decorateStorage(d);
   }catch(_){if(stamp)stamp.textContent='Proxmox snapshot unavailable.';}
  };
- const original=window.neofandStorageRefresh;
- if(original)window.neofandStorageRefresh=async()=>{if(!snapshot)try{await read()}catch(_){}await original();decorateStorage(snapshot)};
+ window.neofandDecorateStorage=()=>decorateStorage(snapshot);
  document.addEventListener('DOMContentLoaded',()=>{if(document.getElementById('pve-guest-tiles'))window.neofandProxmoxRefresh()});
 })();
