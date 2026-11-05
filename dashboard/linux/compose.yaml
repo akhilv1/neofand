@@ -29,7 +29,7 @@ services:
     cpus: 0.5
     volumes:
       - ./linux_api.py:/app/linux_api.py:ro
-      - ./telemetry:/host/telemetry:ro
+      - ${NEOFAND_HOST_DATA_DIR:-./telemetry}:/host/telemetry:ro
     command: ["python", "-B", "/app/linux_api.py"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=3)"]

@@ -14,6 +14,7 @@ done
 install -d -m 755 /opt/neofand-host
 install -d -m 755 -o neofand-collector -g neofand-collector /var/lib/neofand-host
 install -m 644 "$script_dir"/linux_telemetry.py "$script_dir"/system_events.py "$script_dir"/storage_collect.py "$script_dir"/storage_topology.py /opt/neofand-host/
+install -m 644 "$script_dir"/export_history.py "$script_dir"/PERSISTENCE.md /opt/neofand-host/
 cat > /etc/systemd/system/neofand-host.service <<'UNIT'
 [Unit]
 Description=NeoCharge physical-host telemetry
