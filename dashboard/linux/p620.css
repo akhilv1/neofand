@@ -10,3 +10,21 @@
 .p620-connectors text{fill:#23634f;font:600 10px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}
 .p620-key{display:inline-block;color:#23634f;background:#e4f2eb;border:1px solid #91bba9;border-radius:4px;padding:2px 5px;margin-right:5px;font-size:11px;font-variant-numeric:tabular-nums}
 @media(max-width:760px){.p620-connectors path{display:none}}
+
+/* Proxmox overview and storage inventory. */
+.pve-systems{display:none}.pve-host .pve-systems{display:block}
+#pve-guest-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px;margin-top:14px}
+.pve-guest-tile{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--panel-head);min-width:0}
+.pve-tile-top,.pve-tile-stats{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}
+.pve-guest-tile h3{margin:12px 0 2px;font-size:16px;overflow-wrap:anywhere}.pve-guest-id{color:var(--muted);font-size:12px}.pve-tile-stats{margin-top:14px;color:var(--muted)}
+.pve-kind,.pve-state{padding:3px 7px;border-radius:5px;border:1px solid var(--line);font-weight:700}.pve-state.running{color:#2b9169;background:#e0f5e9}
+.pve-storage #storage-drives{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start;gap:12px}
+.pve-storage .storage-drive{min-width:0;padding:16px}.pve-storage .storage-drive h3{font-size:15px}.pve-storage .storage-drive-heading{align-items:start}
+.pve-storage .storage-intro>.storage-note:first-of-type{display:none}
+.pve-storage .storage-intro>.storage-note:last-child{margin-top:10px}
+.pve-storage-uses{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}.pve-owner-badge,.pve-host-badge{display:inline-flex;border-radius:5px;padding:4px 7px;border:1px solid #76ad9a;background:#e2f3ec;color:#225d49;font-size:11px;font-weight:650}
+.pve-host-badge{margin-top:9px;color:var(--muted);background:var(--panel-head);border-color:var(--line)}
+.pve-detail-toggle{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}.pve-detail-toggle>summary{cursor:pointer;color:var(--ink);font-size:12px;font-weight:650}
+.pve-detail-toggle[open]>summary{margin-bottom:12px}
+@media(max-width:700px){#pve-guest-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:430px){#pve-guest-tiles{grid-template-columns:1fr}}

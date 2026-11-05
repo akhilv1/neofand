@@ -60,10 +60,11 @@ html=html.replace('See what’s using each drive. Categories estimate Models, Ph
 html=html.replace('The metadata index reconciles about every 30 minutes; cached categories remain visible during updates. Space totals refresh separately.','File category indexing is not enabled on this host. Space totals refresh separately.')
 html=html.replace('<div class="grp">Monitoring</div>','<div class="grp">Monitoring</div><a data-tab="proxmox">Proxmox</a>')
 html=html.replace('<div id="tab-storage" hidden>','<div id="tab-proxmox" class="grid" hidden><section class="card wide"><h2>Proxmox</h2><div class="body"><p id="proxmox-status">Loading host inventory…</p><p class="sub">Read-only node, VM/container status and recent tasks. Guest controls are managed in Proxmox.</p><div class="tw" id="proxmox-resources"></div></div></section></div><div id="tab-storage" hidden>')
+html=html.replace('<div id="tab-overview" class="grid">','<div id="tab-overview" class="grid"><section class="card wide pve-systems"><h2>Systems <span id="pve-guest-count" class="tail"></span></h2><div class="body"><p class="sub">VMs and LXCs on this Proxmox node</p><div id="pve-guest-tiles"></div></div></section>')
 html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors"];','const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "proxmox"];')
 html=html.replace('else if (state.tab === "errors") await loadEvents();','else if (state.tab === "proxmox") await window.neofandProxmoxRefresh();\n    else if (state.tab === "errors") await loadEvents();')
 html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => !window.neofandHostInfo || Boolean(window.neofandHostInfo.proxmox_available),")
-html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();')
+html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();document.body.classList.toggle("pve-host",Boolean(d.proxmox_available));')
 html=html.replace('</head>','<script src="/hardware/assets/proxmox.js" defer></script></head>')
 output.write_text(html)
 
