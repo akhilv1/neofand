@@ -1,5 +1,7 @@
 """Read-only Proxmox inventory; root-local pvesh, no API token or guest controls."""
 import json
+import hashlib
+import os
 from pathlib import Path
 import re
 import socket
@@ -89,34 +91,102 @@ def guest_capacity(guests,uses):
 def normalize_smart(raw,exit_code=0):
     nvme=raw.get('nvme_smart_health_information_log',{})
     passed=raw.get('smart_status',{}).get('passed')
+    sleeping=any(re.search(r'(standby|sleep) mode',m.get('string',''),re.I) for m in raw.get('smartctl',{}).get('messages',[]))
+    attrs={a['id']:a for a in raw.get('ata_smart_attributes',{}).get('table',[])}
+    value=lambda ident:attrs.get(ident,{}).get('raw',{}).get('value')
     available=isinstance(passed,bool) and not (exit_code & 7)
-    state='unavailable' if not available else 'failed' if not passed or nvme.get('critical_warning',0) else 'passed'
-    if state=='passed' and (nvme.get('media_errors',0)>0 or nvme.get('percentage_used',0)>=100):state='warning'
-    return dict(state=state,model=raw.get('model_name'),temperature_c=raw.get('temperature',{}).get('current'),
-                endurance_used_pct=nvme.get('percentage_used'),available_spare_pct=nvme.get('available_spare'),
-                media_errors=nvme.get('media_errors'),critical_warning=nvme.get('critical_warning'),
-                power_on_hours=raw.get('power_on_time',{}).get('hours'))
+    state='sleeping' if sleeping else 'unavailable' if not available else 'failed' if not passed or nvme.get('critical_warning',0) else 'passed'
+    history=[]
+    if exit_code & 32:history.append('Past SMART threshold exceeded')
+    if exit_code & 64:history.append('Recorded ATA errors')
+    if exit_code & 128:history.append('Recorded self-test errors')
+    if state=='passed' and (exit_code & 16 or history or nvme.get('media_errors',0)>0 or nvme.get('percentage_used',0)>=100 or any((value(i) or 0)>0 for i in (5,197,198))):state='warning'
+    serial=raw.get('serial_number')
+    return dict(state=state,model=raw.get('model_name'),device_id=hashlib.sha256((str(raw.get('model_name'))+':'+str(serial)).encode()).hexdigest()[:24] if serial else None,
+                temperature_c=raw.get('temperature',{}).get('current'),endurance_used_pct=nvme.get('percentage_used'),
+                available_spare_pct=nvme.get('available_spare'),media_errors=nvme.get('media_errors'),critical_warning=nvme.get('critical_warning'),
+                power_on_hours=raw.get('power_on_time',{}).get('hours'),reallocated_sectors=value(5),pending_sectors=value(197),
+                uncorrectable_sectors=value(198),ata_error_count=raw.get('ata_smart_error_log',{}).get('summary',{}).get('count'),
+                history_warnings=history)
 
 
-def pool_health(storage_path):
+def storage_health(storage_path):
     try:storage=json.loads(Path(storage_path).read_text())
-    except (OSError,ValueError):return []
-    result=[];cache={}
+    except (OSError,ValueError):return None,[]
+    if time.time()-storage.get('timestamp',0)>180:return None,[]
+    drives=[];cache={}
+    for drive in storage.get('drives',[]):
+        device=drive.get('device','')
+        if not re.fullmatch(r'/dev/(?:nvme\d+n\d+|sd[a-z]+|hd[a-z]+)',device):continue
+        try:
+            r=subprocess.run(['smartctl','-a','-j','-n','standby,3',device],capture_output=True,text=True,timeout=5)
+            smart=normalize_smart(json.loads(r.stdout),r.returncode)
+        except (OSError,ValueError,subprocess.SubprocessError):smart={'state':'unavailable'}
+        smart['model']=smart.get('model') or drive.get('model') or device
+        cache[device]=smart;drives.append(dict(device=device,smart=smart))
+    pools=[]
     for pool in storage.get('pools',[]):
-        members=[]
-        for member in pool.get('members',[]):
-            for device in member.get('backing_drives',[]):
-                # Only read known whole block devices; never accept command options or arbitrary paths.
-                if not re.fullmatch(r'/dev/(?:nvme\d+n\d+|sd[a-z]+|hd[a-z]+)',device):continue
-                if device not in cache:
-                    try:
-                        r=subprocess.run(['smartctl','-a','-j',device],capture_output=True,text=True,timeout=5)
-                        cache[device]=normalize_smart(json.loads(r.stdout),r.returncode)
-                    except (OSError,ValueError,subprocess.SubprocessError):cache[device]={'state':'unavailable'}
-                members.append(dict(device=device,partition=member.get('path'),state=member.get('state'),smart=cache[device]))
-        result.append(dict(name=pool.get('name'),health=pool.get('health'),topology=pool.get('topology',[]),
-                           scan=pool.get('scan'),timestamp=storage.get('timestamp'),members=members))
-    return result
+        members=[dict(device=dev,partition=m.get('path'),state=m.get('state'),smart=cache.get(dev,{'state':'unavailable'}))
+                 for m in pool.get('members',[]) for dev in m.get('backing_drives',[])]
+        pools.append(dict(name=pool.get('name'),health=pool.get('health'),topology=pool.get('topology',[]),
+                          scan=pool.get('scan'),timestamp=storage.get('timestamp'),members=members))
+    return drives,pools
+
+
+HEALTH_FIELDS=('state','critical_warning','media_errors','reallocated_sectors','pending_sectors','uncorrectable_sectors','ata_error_count','endurance_used_pct','available_spare_pct','history_warnings')
+
+def health_history(previous,drives,now,retention_days=365):
+    """Durable transitions; standby is neutral and failed reads need three samples."""
+    states={k:dict(v) for k,v in previous.get('states',{}).items()};events=list(previous.get('events',[]));seen=set()
+    def event(device,title,message,severity):
+        ident=hashlib.sha256(f'{now}:{device}:{title}:{message}'.encode()).hexdigest()[:24]
+        events.append(dict(id=ident,ts=now,source='SMART',kind='storage',title=title,unit=device,message=message,severity=severity,confidence='recorded'))
+    for item in drives:
+        device=item['device'];smart=item['smart'];key=smart.get('device_id') or next((k for k,v in states.items() if v.get('device')==device),device)
+        if key!=device and key not in states and device in states and not states[device].get('health'):
+            states[key]=states.pop(device)
+        seen.add(key);old=states.get(key,{});current=smart.get('state','unavailable')
+        if current=='sleeping':
+            states[key]={**old,'device':device,'misses':0,'last_seen':now};continue
+        if current=='unavailable':
+            misses=old.get('misses',0)+1
+            if misses==3:event(device,'Drive health readings unavailable','SMART could not be read for three consecutive samples.','warning')
+            states[key]={**old,'device':device,'misses':misses,'last_seen':now};continue
+        if old.get('misses',0)>=3:event(device,'Drive health readings restored','SMART readings are available again.','info')
+        before=old.get('health');after={k:smart.get(k) for k in HEALTH_FIELDS}
+        if before is None:
+            if current in ('warning','failed'):
+                event(device,'Existing drive health warning observed',f'{smart.get("model",device)}: {current}; '+('; '.join(smart.get('history_warnings',[])) or 'SMART health indicators require attention')+'. Initial baseline; this is not a newly detected deterioration.','error' if current=='failed' else 'warning')
+        else:
+            changes=[f'{k.replace("_"," ")}: {before.get(k)} → {after[k]}' for k in HEALTH_FIELDS if before.get(k)!=after[k]]
+            if changes:
+                danger=any(isinstance(after.get(k),(int,float)) and after[k]>(before.get(k) or 0) for k in ('media_errors','pending_sectors','reallocated_sectors','uncorrectable_sectors','ata_error_count'))
+                severity='error' if current=='failed' else 'warning' if current=='warning' or danger else 'info'
+                event(device,'Drive health changed',f'{smart.get("model",device)} · '+'; '.join(changes),severity)
+        states[key]=dict(device=device,health=after,misses=0,last_seen=now)
+    for key,old in list(states.items()):
+        if key in seen:continue
+        misses=old.get('misses',0)+1
+        if misses==3:event(old['device'],'Drive no longer detected','Physical drive is absent from three consecutive storage snapshots.','warning')
+        old['misses']=misses
+        if now-old.get('last_seen',now)>retention_days*86400:del states[key]
+    cutoff=now-retention_days*86400
+    events=sorted((e for e in events if e['ts']>=cutoff),key=lambda e:e['ts'],reverse=True)[:10000]
+    return dict(timestamp=now,status='ok',retention_days=retention_days,states=states,events=events)
+
+
+def save_health_history(path,drives):
+    try:previous=json.loads(path.read_text())
+    except FileNotFoundError:previous={}
+    # Do not discard a corrupt baseline silently or repeatedly seed false alerts.
+    data=health_history(previous,drives,time.time(),max(1,min(3650,int(os.environ.get('NEOFAND_DRIVE_EVENT_RETENTION_DAYS','365')))))
+    tmp=path.with_suffix('.tmp')
+    with tmp.open('w') as f:
+        json.dump(data,f);f.flush();os.fsync(f.fileno())
+    tmp.chmod(0o644);tmp.replace(path)
+    fd=os.open(str(path.parent),os.O_RDONLY)
+    try:os.fsync(fd)
+    finally:os.close(fd)
 
 
 def normalize(node,status,resources,tasks):
@@ -141,7 +211,9 @@ def main(path):
         data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources'),query('/nodes/'+node+'/tasks','--limit','50'))
         data['storage_uses']=guest_storage(data['guests'])
         data['guest_storage']=guest_capacity(data['guests'],data['storage_uses'])
-        data['pool_health']=pool_health(target.parent/'storage.json')
+        drives,data['pool_health']=storage_health(target.parent/'storage.json')
+        data['drive_health']=drives or []
+        if drives is not None:save_health_history(target.parent/'drive-health-history.json',drives)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError):
         try:data=json.loads(target.read_text())
         except (OSError,ValueError):data={'timestamp':0,'guests':[],'tasks':[],'node':node}

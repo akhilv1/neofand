@@ -60,9 +60,25 @@
   card.insertBefore(panel,card.querySelector(':scope > details'));
  }
 
+ function driveHealth(card,d,device){
+  const smart=(d.drive_health||[]).find(x=>x.device===device)?.smart||{state:'unavailable'};
+  const stale=d.status!=='ok'||Date.now()/1000-d.timestamp>180;
+  const row=element('div',undefined,'pve-drive-health');
+  const labels={passed:'SMART passed',warning:'SMART warning',failed:'SMART failed',sleeping:'Sleeping',unavailable:'SMART unavailable'};
+  row.append(element('span',(labels[smart.state]||'SMART unavailable')+(stale?' · stale':''),'pve-health-indicator '+(stale?'unknown':smart.state)));
+  const fmt=(v,suffix='')=>Number.isFinite(v)?v.toLocaleString()+suffix:'—';
+  if(smart.state==='sleeping')row.append(element('p','Standby drive · health check deferred to avoid waking it.','storage-note'));
+  else if(smart.state!=='unavailable'){
+   const metrics=smart.media_errors!=null?`Media errors ${fmt(smart.media_errors)} · Endurance used ${fmt(smart.endurance_used_pct,'%')}`:`Reallocated ${fmt(smart.reallocated_sectors)} · Pending ${fmt(smart.pending_sectors)} · Uncorrectable ${fmt(smart.uncorrectable_sectors)}`;
+   row.append(element('p',`${fmt(smart.temperature_c,' °C')} · ${metrics}`,'storage-note'));
+   if(smart.history_warnings?.length)row.append(element('p',smart.history_warnings.join(' · ')+(smart.ata_error_count?' · '+smart.ata_error_count+' recorded ATA errors':''),'storage-note storage-warning'));
+  }
+  card.insertBefore(row,card.querySelector(':scope > details'));
+ }
+
  function decorateStorage(d){const tab=document.getElementById('tab-storage');if(!tab||!d)return;
   guestVolumes(d);summaryScope();tab.classList.add('pve-storage');const cards=[...tab.querySelectorAll('#storage-drives > .storage-drive')];
-  for(const card of cards){const wasOpen=Boolean(card.querySelector(':scope > .pve-detail-toggle[open]'));for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge,.pve-mirror-health').forEach(n=>n.remove());
+  for(const card of cards){const wasOpen=Boolean(card.querySelector(':scope > .pve-detail-toggle[open]'));for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge,.pve-mirror-health,.pve-drive-health').forEach(n=>n.remove());
    const title=card.querySelector(':scope > .storage-drive-heading, :scope > .storage-title-line');if(!title)continue;const ownerContainer=title.classList.contains('storage-drive-heading')?title.firstElementChild:title;
    const meta=title.querySelector('.storage-note')?.textContent||'';
    const device=meta.match(/\/dev\/[a-z0-9]+/)?.[0];
@@ -75,6 +91,7 @@
    const children=[...card.children].filter(n=>n!==title);
    if(children.length){const detail=element('details',undefined,'pve-detail-toggle');detail.dataset.storageKey=card.id||device||pool||'';detail.open=wasOpen;detail.append(element('summary','Partitions, datasets & usage'),...children);card.append(detail)}
    mirrorHealth(card,d,pool);
+   if(device && !card.id)driveHealth(card,d,device);
   }
   const note=tab.querySelector('.storage-intro > .storage-note:last-child');if(note)note.textContent='VM ownership badges are shown only for whole physical disks configured for passthrough. PVE Boot Disk is the host boot pool. Raw installed capacity includes mirror copies; host totals cover filesystems PVE can read. Guest readings appear separately below and are not added to host totals.';
  }

@@ -7,7 +7,7 @@ root=Path(__file__).resolve().parent
 source=Path(sys.argv[1]);output=Path(sys.argv[2])
 html=source.read_text()
 html=html.replace('id="hostline">neo-mac-pro','id="hostline">Connecting to hardware')
-html=html.replace('</head>','<link rel="stylesheet" href="/hardware/assets/p620.css?v=20261105-mirror-health">\n</head>')
+html=html.replace('</head>','<link rel="stylesheet" href="/hardware/assets/p620.css?v=20261105-drive-alerts">\n</head>')
 start=html.index('    <div id="tab-sensors"');end=html.index('    <div id="tab-errors"',start)
 html=html[:start]+(root/'p620-sensors.html').read_text()+'\n'+html[end:]
 html=html.replace('/hardware/assets/sensor-diagram.js?v=20261104-7','/hardware/assets/p620.js?v=20261105-lxc2')
@@ -65,7 +65,7 @@ html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "sto
 html=html.replace('else if (state.tab === "errors") await loadEvents();','else if (state.tab === "proxmox") await window.neofandProxmoxRefresh();\n    else if (state.tab === "errors") await loadEvents();')
 html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => !window.neofandHostInfo || Boolean(window.neofandHostInfo.proxmox_available),")
 html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();document.body.classList.toggle("pve-host",Boolean(d.proxmox_available));')
-html=html.replace('</head>','<script src="/hardware/assets/proxmox.js?v=20261105-mirror-health" defer></script></head>')
+html=html.replace('</head>','<script src="/hardware/assets/proxmox.js?v=20261105-drive-alerts" defer></script></head>')
 output.write_text(html)
 
 # Default the GPU builder to this host's platform; saved layouts still take precedence.

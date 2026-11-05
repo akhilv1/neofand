@@ -50,7 +50,7 @@ export_container=$(docker create "$image")
 docker export "$export_container" | zstd -T2 -8 -o "$out/$name"
 (cd "$out" && sha256sum "$name" > "$name.sha256")
 mkdir -p "$work/host-collector"
-cp "$repo/dashboard/linux/linux_telemetry.py" "$repo/dashboard/"{system_events.py,storage_collect.py,storage_topology.py} "$repo/dashboard/lxc/"{install-host-collector.sh,proxmox_collect.py} "$work/host-collector/"
+cp "$repo/dashboard/linux/linux_telemetry.py" "$repo/dashboard/"{system_events.py,storage_collect.py,storage_topology.py,export_history.py,PERSISTENCE.md} "$repo/dashboard/lxc/"{install-host-collector.sh,proxmox_collect.py} "$work/host-collector/"
 tar czf "$out/host-collector.tar.gz" -C "$work" host-collector
 (cd "$out" && sha256sum host-collector.tar.gz > host-collector.tar.gz.sha256)
 docker run --rm --entrypoint dpkg-query "$image" -W > "$out/packages-${commit:0:7}.txt"

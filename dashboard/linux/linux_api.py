@@ -14,6 +14,21 @@ def snapshot():
     return json.loads((DATA/'linux.json').read_text())
 
 
+def host_events(directory=DATA):
+    try:data=json.loads((directory/'system-events.json').read_text())
+    except (OSError,ValueError):data={'status':'unavailable','timestamp':0,'window_start':0,'events':[],'warnings':['Ubuntu journal readings unavailable.']}
+    data.pop('boot_evidence',None)
+    try:
+        health=json.loads((directory/'drive-health-history.json').read_text())
+        data.setdefault('events',[]).extend(health.get('events',[]))
+        data.setdefault('warnings',[]).append(f"Drive health alerts retained up to {health.get('retention_days',365)} days; maximum 10,000 records.")
+        if time.time()-health.get('timestamp',0)>180:data['warnings'].append('Drive health monitoring is stale; retained alerts are shown.')
+    except FileNotFoundError:pass
+    except (OSError,ValueError):data.setdefault('warnings',[]).append('Drive health alert history unavailable.')
+    data['events']=sorted(data.get('events',[]),key=lambda e:e.get('ts',0),reverse=True)
+    return data
+
+
 def series(query, database):
     now=int(time.time())
     start=max(now-30*86400,int(query.get('from',[now-21600])[0]))
@@ -36,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
             path=url.path
             if path=='/api/series': data=series(parse_qs(url.query),DATA/'linux.sqlite')
             elif path=='/api/host-events':
-                data=json.loads((DATA/'system-events.json').read_text());data.pop('boot_evidence',None)
+                data=host_events()
             elif path=='/api/proxmox': data=json.loads((DATA/'proxmox.json').read_text())
             elif path=='/api/host-storage': data=json.loads((DATA/'storage.json').read_text())
             elif path=='/api/events': data={'events':[]}

@@ -46,3 +46,5 @@ References: [Proxmox container documentation](https://github.com/proxmox/pve-doc
 ### ZFS and drive health
 
 On Proxmox, the root inventory collector reads ZFS member devices from the host storage snapshot and runs read-only `smartctl -a -j` queries once per minute. Install `smartmontools` on the Proxmox host to enable SMART summaries. Missing or failed readings are shown as unavailable. No self-tests or device settings are changed. The container receives only summarized health fields, without drive serial numbers.
+
+Persistence and per-host centralized archive instructions: [PERSISTENCE.md](../PERSISTENCE.md). The host collector bundle includes `export_history.py`. Central archival is optional and requires an explicitly configured destination.
