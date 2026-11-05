@@ -10,7 +10,7 @@ import time
 
 def collect():
     result = subprocess.run(['lsblk', '--json', '--bytes', '--exclude', '7', '--output',
-                             'NAME,TYPE,SIZE,MODEL,FSTYPE,MOUNTPOINTS,MAJ:MIN,ROTA,TRAN'],
+                             'NAME,TYPE,SIZE,MODEL,FSTYPE,PARTTYPE,PARTTYPENAME,MOUNTPOINTS,MAJ:MIN,ROTA,TRAN'],
                             check=True, capture_output=True, text=True, timeout=10)
     devices = json.loads(result.stdout)['blockdevices']
     # systemd hardening creates private bind mounts; use PID 1's host mount table.
@@ -22,7 +22,9 @@ def collect():
 
     def describe(node):
         mounts = list(dict.fromkeys(host_mounts.get(node.get('maj:min'), [])))
-        item = {key: node.get(key) for key in ('name', 'type', 'size', 'model', 'fstype', 'rota', 'tran')}
+        item = {key: node.get(key) for key in ('name', 'type', 'size', 'model', 'fstype', 'rota', 'tran', 'parttype', 'parttypename')}
+        partition_type = (node.get('parttypename') or '').lower()
+        item['auxiliary'] = partition_type in {'efi system', 'bios boot', 'microsoft reserved', 'apple boot', 'apple label'} or 'metadata' in partition_type
         item.update(device='/dev/' + node['name'], filesystem_id=node.get('maj:min'),
                     mounts=mounts, usage=None, usage_status='unmounted')
         for mount in mounts:
