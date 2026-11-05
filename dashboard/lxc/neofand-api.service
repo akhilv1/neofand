@@ -1,0 +1,15 @@
+[Unit]
+Description=NeoCharge read-only hardware API
+After=network.target
+[Service]
+User=neofand
+Group=neofand
+Environment=NEOFAND_DATA_DIR=/var/lib/neofand/telemetry
+Environment=NEOFAND_BIND=127.0.0.1
+Environment=NEOFAND_PORT=4792
+ExecStart=/usr/bin/python3 -B /opt/neofand/linux_api.py
+Restart=on-failure
+NoNewPrivileges=true
+UMask=0022
+[Install]
+WantedBy=multi-user.target

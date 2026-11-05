@@ -3,11 +3,19 @@
   const set=(id,value)=>{const n=node(id);if(n)n.textContent=value;};
   const number=(v,unit='',digits=0)=>Number.isFinite(v)?v.toFixed(digits)+unit:'Unavailable';
   const gib=v=>number(Number.isFinite(v)?v/1073741824:null,' GiB',1);
+  window.neofandHostConnected=info=>{
+    set('host-title',info.host.product_family||info.host.product_version||'Linux host');
+    set('host-detail',info.host.hostname+' · '+info.host.cpu);
+    set('cpu-name','CPU');set('gpu-name',info.gpus?.[0]?.name||'GPU unavailable');
+    const p620=info.host.platform==='lenovo-p620';
+    document.querySelector('.p620-chassis').hidden=!p620;
+    document.querySelector('.p620-visual').style.gridTemplateColumns=p620?'':'1fr';
+  };
   let request=0;
   window.neofandDiagramUpdate=async latest=>{
     const own=++request;
     const metric=(sub,name)=>latest.find(m=>m.subsystem===sub&&m.name===name)?.value;
-    const cpu=latest.filter(m=>m.subsystem==='hwmon'&&/^k10temp.*Tctl/.test(m.name));
+    const cpu=latest.filter(m=>m.subsystem==='hwmon'&&/^(k10temp.*Tctl|coretemp.*Package)/.test(m.name));
     const cpuLoad=metric('host','cpu_pct'),gpuLoad=metric('gpu','gpu0_util_gpu_pct');
     set('cpu-temp',number(cpu[0]?.value,' °C',1));set('cpu-load',number(cpuLoad,' %',1));
     set('gpu-temp',number(metric('gpu','gpu0_temp_c'),' °C'));set('gpu-load',number(gpuLoad,' %',1));

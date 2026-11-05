@@ -1,13 +1,14 @@
 """Container HTTP reader for host-written telemetry; no control endpoints."""
 import json
 import math
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sqlite3
 import time
 from urllib.parse import urlparse, parse_qs
 
-DATA=Path('/host/telemetry')
+DATA=Path(os.environ.get('NEOFAND_DATA_DIR','/host/telemetry'))
 
 def snapshot():
     return json.loads((DATA/'linux.json').read_text())
@@ -56,4 +57,4 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
     def log_message(self,*args): pass
 
-if __name__=='__main__': ThreadingHTTPServer(('0.0.0.0',8080),Handler).serve_forever()
+if __name__=='__main__': ThreadingHTTPServer((os.environ.get('NEOFAND_BIND','0.0.0.0'),int(os.environ.get('NEOFAND_PORT','8080'))),Handler).serve_forever()

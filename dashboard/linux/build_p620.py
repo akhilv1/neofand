@@ -6,7 +6,7 @@ import sys
 root=Path(__file__).resolve().parent
 source=Path(sys.argv[1]);output=Path(sys.argv[2])
 html=source.read_text()
-html=html.replace('id="hostline">neo-mac-pro','id="hostline">Lenovo ThinkStation P620 · cheese')
+html=html.replace('id="hostline">neo-mac-pro','id="hostline">Connecting to hardware')
 html=html.replace('</head>','<link rel="stylesheet" href="/hardware/assets/p620.css">\n</head>')
 start=html.index('    <div id="tab-sensors"');end=html.index('    <div id="tab-errors"',start)
 html=html[:start]+(root/'p620-sensors.html').read_text()+'\n'+html[end:]
@@ -21,9 +21,10 @@ for tab in ('services','boot'):
 a=html.index('function renderSummary()');b=html.index('\nlet eventRequest=',a)
 html=html[:a]+'''function renderSummary() {
  const val=(s,n)=>latestOf(s,n), f=(v,u)=>v==null?'Unavailable':v.toFixed(1)+' '+u;
- const rows=[['Platform','Lenovo ThinkStation P620'],['CPU','AMD Ryzen Threadripper PRO 3945WX'],
+ const info=window.neofandHostInfo||{},host=info.host||{},gpu=info.gpus?.[0];
+ const rows=[['Platform',host.product_family||host.product_version||'Connecting'],['CPU',host.cpu||'Unavailable'],
  ['CPU load',f(val('host','cpu_pct'),'%')],['Memory in use',f(val('host','mem_used_pct'),'%')],
- ['GPU','NVIDIA GeForce RTX 3090 · 24 GiB'],['GPU board power',f(val('gpu','gpu0_power_w'),'W')],
+ ['GPU',gpu?.name||'Unavailable'],['GPU board power',f(val('gpu','gpu0_power_w'),'W')],
  ['GPU temperature',f(val('gpu','gpu0_temp_c'),'°C')],['Total PSU power / chassis fans','Not exposed by the host']];
  put($('summary'),table(['Item','Reading'],rows));
  const fresh=state.latest.length&&Date.now()/1000-Math.max(...state.latest.map(m=>m.ts))<30;
@@ -43,6 +44,9 @@ inject="""
 const historyNote=el('div','p620-history','Collecting history on this host…');
 $('tab-overview').prepend(historyNote);
 getJSON('/hardware/api/host-info').then(d=>{
+ window.neofandHostInfo=d;
+ $('hostline').textContent=(d.host.product_family||d.host.product_version||'Linux')+' · '+d.host.hostname;
+ window.neofandHostConnected?.(d);renderSummary();
  historyNote.textContent='History starts '+fmtTime(d.history_since)+'. Live samples every 2 seconds; chart history every 30 seconds.';
 }).catch(()=>historyNote.textContent='History metadata unavailable.');
 """
