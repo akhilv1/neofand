@@ -1,6 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
-  let models = [], selected, view = 'edge';
+  let models = [], selected, view = 'edge', platform='macpro-7-1';
+  window.addEventListener('neofand-platform-selected',e=>{platform=e.detail.platform;if(selected)renderSelected(selected);});
   function sourceLink(value) { const u=new URL(value); return u.protocol === 'https:' ? u.href : '#'; }
   function occupancy() {
     if (!selected) return;
@@ -16,7 +17,7 @@
     $('family').textContent=`${model.vendor} · ${model.category}`;
     $('name').textContent=model.name; $('variant').textContent=model.variant;
     const path=`models/${model.id}-${view}.svg`;
-    const rendered = view === 'edge' && model.installed_asset;
+    const rendered = view === 'edge' && (platform==='lenovo-p620'?model.p620_asset:model.installed_asset);
     $('model-image').src=rendered || path;
     $('model-image').alt=rendered ? `${model.name} illustrative installed profile` : `${model.name} ${view} schematic`;
     $('preview-caption').textContent=rendered ? `${model.artwork_description} · ${model.artwork_status}` : 'Schematic artwork · dimensional envelope';
@@ -25,6 +26,7 @@
       const link=$(id); link.hidden=!model[key]; if(model[key])link.href=model[key];
     }
     $('render-preview').textContent=model.render_preview_label || 'Rendered sample ↗';
+    if(platform==='lenovo-p620'&&model.p620_asset){$('render-preview').href=model.p620_asset;$('render-preview').textContent='P620 installed view ↗';$('render-preview').hidden=false;}
     $('notes').textContent=model.notes || (model.thickness_mm ? 'Manufacturer dimensions recorded for this board variant.' : 'Exact cooler thickness is unpublished here. Edge view uses a labeled nominal slot envelope.');
     if(model.installation_layout) $('notes').textContent+=' Chassis reference: up to two full-height modules, shown filling the two reserved MPX bays. Afterburner omitted; this visual spacing is not a measured thickness.';
     if(model.visual_profile_note) $('notes').textContent+=' '+model.visual_profile_note;

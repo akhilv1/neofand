@@ -30,3 +30,7 @@ The builder saves layouts in the current browser under `neofand-gpu-layout-v1`. 
 
 
 NVIDIA workstation installed views now share the user-requested A6000 photographic base with crisp per-model shroud lettering. Generation and variant suffixes remain in the picker but are omitted from the artwork. These are shared visual-family previews scaled to each catalog envelope, not separate mechanical replicas. Full-height MPX artwork fills its reserved bay to match the supplied two-module reference. Both add controls disable when no valid connector placement remains.
+
+## Platform layouts
+
+The builder now includes Mac Pro 7,1 and Lenovo ThinkStation P620 with separate saved layouts. P620 is a provisional visualization with documented slot-power restrictions and no connected host telemetry. See [P620 compatibility and validation](builder/P620.md). Every non-MPX profile includes a P620-oriented installed asset with readable lettering; the Mac Pro assets remain intact. RTX 3090 FE now has its own photographic study rather than sharing the 4090 asset.

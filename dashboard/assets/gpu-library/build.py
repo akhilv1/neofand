@@ -121,7 +121,7 @@ RASTER_MAP = {
  'rtx-6000-ada':'rtx-6000-ada.png',
  'rtx-pro-6000-maxq':'rtx-pro-6000-maxq.png',
  'rtx-pro-6000-workstation':'rtx-pro6000-workstation.png',
- 'rtx-3080-fe':'geforce-clean.png','rtx-3090-fe':'geforce-clean.png','rtx-3090ti-fe':'geforce-clean.png',
+ 'rtx-3080-fe':'geforce-clean.png','rtx-3090-fe':'rtx-3090-fe.png','rtx-3090ti-fe':'geforce-clean.png',
  'rtx-4080-fe':'geforce-clean.png','rtx-4080s-fe':'geforce-clean.png','rtx-4090-fe':'geforce-clean.png',
  'rtx-5080-fe':'geforce-blackwell.png','rtx-5090-fe':'geforce-blackwell.png',
  'rtx-4060ti-ventus':'msi-ventus-black.png',
@@ -140,17 +140,34 @@ def geometry(model, edge=False):
         height=known or (145 if model['category']=='Apple MPX' else 111.76)
     return length,height
 
-def workstation_photo(model,length,height):
-    image=Image.open(ROOT/'artwork/workstation-photo-base.png')
+def workstation_photo(model,length,height,p620=False):
+    base=ROOT/('artwork/p620/workstation-photo-base.png' if p620 else 'artwork/workstation-photo-base.png')
+    image=Image.open(base)
     x,y,x2,y2=image.getchannel('A').point(lambda a:255 if a>=128 else 0).getbbox()
-    x2-=round((x2-x)*.047)
+    if not p620:x2-=round((x2-x)*.047)
     bw,bh=x2-x,y2-y
-    data=base64.b64encode((ROOT/'artwork/workstation-photo-base.png').read_bytes()).decode()
+    data=base64.b64encode(base.read_bytes()).decode()
     label=model['name']
     for suffix in [' Ada',' Blackwell',' Max-Q',' Workstation',' SFF',' 12GB']:
         label=label.replace(suffix,'')
     label=label.replace('Quadro ','')
-    return f'<svg width="{length}" height="{height}" viewBox="0 0 {length} {height}" overflow="hidden"><image href="data:image/png;base64,{data}" x="{-x/bw*length}" y="{-y/bh*height}" width="{image.width/bw*length}" height="{image.height/bh*height}" preserveAspectRatio="none"/><text x="{length*.975}" y="{height*.39}" text-anchor="end" fill="#d0c7b7" font-family="Arial,sans-serif" font-weight="600" font-size="{height*.073}">{escape(label)}</text></svg>'
+    labelx=length*(.025 if p620 else .975)
+    anchor='start' if p620 else 'end'
+    return f'<svg width="{length}" height="{height}" viewBox="0 0 {length} {height}" overflow="hidden"><image href="data:image/png;base64,{data}" x="{-x/bw*length}" y="{-y/bh*height}" width="{image.width/bw*length}" height="{image.height/bh*height}" preserveAspectRatio="none"/><text x="{labelx}" y="{height*.39}" text-anchor="{anchor}" fill="#d0c7b7" font-family="Arial,sans-serif" font-weight="600" font-size="{height*.073}">{escape(label)}</text></svg>'
+
+def p620_svg(model):
+    import xml.etree.ElementTree as ET
+    length,height=geometry(model,True)
+    if model['workstation_photo']:
+        body=workstation_photo(model,length,height,True)
+    else:
+        root=ET.fromstring('<g>'+draw(model,length,height,True)+'</g>')
+        for t in root.iter('text'):
+            x=float(t.get('x','0'))
+            t.set('transform',f'translate({2*x} 0) scale(-1 1)')
+            t.set('text-anchor',{'start':'end','end':'start','middle':'middle'}.get(t.get('text-anchor','start'),'end'))
+        body=f'<g transform="translate({length} 0) scale(-1 1)">'+ET.tostring(root,encoding='unicode')+'</g>'
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {length} {height}" role="img" aria-label="{escape(model["name"])} P620 installed orientation">{body}</svg>'
 
 def svg(model,edge=False,installed=False):
     length,height=geometry(model,edge)
@@ -183,10 +200,23 @@ for model in MODELS:
         model['artwork_status']='rendered family profile'
         model['render_preview']=asset
         model['render_preview_label']='Clean installed render ↗'
+    if model['id']=='rtx-3090-fe':
+        model['visual_profile_note']='Dedicated RTX 3090 Founders Edition photorealistic study based on NVIDIA product references, with Ampere angled fins and silver frame. Power cables and mounting bracket omitted; fit uses published 313 mm length and three-slot envelope.'
+        model['artwork_status']='model-specific photorealistic study'
     if model['workstation_photo']:
         model['artwork_status']='A6000-based photographic family with model lettering'
         model['render_preview']=model['installed_asset']
         model['render_preview_label']='Photorealistic installed view ↗'
+    if model['category']!='Apple MPX':
+        model['p620_asset']=f'models/{model["id"]}-p620.svg'
+        if model['id'] in RASTER_MAP and not model['workstation_photo']:
+            asset='artwork/p620/'+RASTER_MAP[model['id']]
+            image=Image.open(ROOT/asset)
+            box=image.getchannel('A').point(lambda a:255 if a>=128 else 0).getbbox()
+            model['p620_asset']=asset
+            model['p620_raster_crop']={'image_width':image.width,'image_height':image.height,'box':box}
+        else:
+            (ROOT/model['p620_asset']).write_text(p620_svg(model))
     for view in ['face','edge']:
         (ROOT/'models'/f'{model["id"]}-{view}.svg').write_text(svg(model,view=='edge'))
     (ROOT/'models'/f'{model["id"]}-installed.svg').write_text(svg(model,True,True))

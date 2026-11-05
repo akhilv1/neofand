@@ -1,12 +1,8 @@
 // Distances are mechanical preview coordinates, measured upward from slot 1.
 // Apple: slots 1–4 double-wide, 5–7 single-wide, 8 half-length I/O.
 export const PITCH = 20.32;
-export const SLOTS = [
-  {id:1,units:0,lanes:16,width:2},{id:2,units:2,lanes:8,width:2},
-  {id:3,units:4,lanes:16,width:2},{id:4,units:6,lanes:16,width:2},
-  {id:5,units:8,lanes:16,width:1},{id:6,units:9,lanes:8,width:1},
-  {id:7,units:10,lanes:8,width:1},{id:8,units:11,lanes:4,width:1,reserved:true}
-];
+import {platformFor,slotsFor} from './platforms.mjs';
+export const SLOTS=slotsFor();
 export const APPLE_SOURCE='https://support.apple.com/en-my/101640';
 const validNumber=n=>Number.isFinite(Number(n))&&Number(n)>0;
 export function dimensions(model,item={},pitch=PITCH) {
@@ -23,26 +19,34 @@ export function dimensions(model,item={},pitch=PITCH) {
 }
 export function envelope(model,item,options={}) {
   const pitch=validNumber(options.pitch_mm)?Number(options.pitch_mm):PITCH;
-  const slot=SLOTS.find(s=>s.id===Number(item.slot));
+  const platform=platformFor(options);
+  const slot=slotsFor(options).find(s=>s.id===Number(item.slot));
   const d=dimensions(model,item,pitch);
   const start=(slot?.units??0)*pitch;
   const width=d.mpx?4*pitch:Math.max(d.thickness,(model.slots??0)*pitch);
-  return {...d,start,end:start+width,width,slot:slot?.id,validSlot:Boolean(slot)&&slot.id!==8&&(!d.mpx||slot.id===1||slot.id===3)};
+  return {...d,start,end:start+width,width,slot:slot?.id,validSlot:Boolean(slot)&&!slot.reserved&&(!d.mpx||(platform.mpx&&(slot.id===1||slot.id===3)))};
 }
 export function assess(items,models,options={}) {
+  const platform=platformFor(options);
   const byId=new Map(models.map(m=>[m.id,m]));
   const pitch=validNumber(options.pitch_mm)?Number(options.pitch_mm):PITCH;
-  const bay=validNumber(options.bay_mm)?Number(options.bay_mm):305;
+  const bay=validNumber(options.bay_mm)?Number(options.bay_mm):platform.bay;
   const gap=Number.isFinite(Number(options.gap_mm))?Math.max(0,Number(options.gap_mm)):0;
-  const io=options.reserve_io!==false;
+  const io=platform.mpx&&options.reserve_io!==false;
   const tolerance=0.1; // Published dimensions may round 60.96 mm to 61 mm.
-  const cards=items.map(item=>{const model=byId.get(item.model);return {item,model,env:model?envelope(model,item,{pitch_mm:pitch}):null,errors:[],notes:[]};});
+  const cards=items.map(item=>{const model=byId.get(item.model);return {item,model,env:model?envelope(model,item,{...options,pitch_mm:pitch}):null,errors:[],notes:[]};});
   for(const c of cards) {
     if(!c.model){c.errors.push('Unknown card model');continue;}
-    if(!c.env.validSlot)c.errors.push(c.env.mpx?'MPX modules must start in bay A (slot 1) or bay B (slot 3)':'Choose slot 1–7');
+    if(c.env.mpx&&!platform.mpx)c.errors.push('Apple MPX modules are incompatible with the P620');
+    if(!c.env.validSlot)c.errors.push(c.env.mpx?'MPX modules must start in bay A (slot 1) or bay B (slot 3)':`Choose a usable ${platform.name} connector`);
     if(c.env.length>bay+tolerance)c.errors.push(`${(c.env.length-bay).toFixed(1)} mm longer than the bay`);
-    if(c.env.end>12*pitch+tolerance)c.errors.push('Extends beyond the expansion area');
+    if(c.env.end>platform.units*pitch+tolerance)c.errors.push('Extends beyond the expansion area');
     if(io&&c.env.end>11*pitch+tolerance)c.errors.push('Overlaps the Apple I/O card in slot 8');
+    if(platform.id==='lenovo-p620'){
+      const slot=platform.slots.find(s=>s.id===c.item.slot);
+      if(slot?.watts===25)c.errors.push('25 W x8 connector: GPU slot-power compatibility is unverified; use a 75 W x16 position');
+      c.notes.push('P620 bay dimensions are provisional; verify length, height and cable clearance on the host');
+    }
     if(c.env.estimated)c.notes.push('Unpublished dimensions use a nominal envelope; enter measured dimensions to confirm');
     if(c.env.mpx)c.notes.push('Reserves the complete MPX connector pair');
     if(c.model.style==='passive')c.notes.push('Passive card requires directed system airflow');
@@ -66,7 +70,9 @@ export function assess(items,models,options={}) {
   return {cards,pairs,hasErrors:cards.some(c=>c.errors.length),hasEstimates:cards.some(c=>c.env?.estimated),pitch,bay,gap};
 }
 export function firstFreeSlot(model,items,models,options={}) {
-  const choices=model.category==='Apple MPX'?[1,3]:[1,2,3,4,5,6,7];
+  const p=platformFor(options);
+  if(model.category==='Apple MPX'&&!p.mpx)return null;
+  const choices=model.category==='Apple MPX'?[1,3]:p.id==='lenovo-p620'?[3,1,4,5,2,6]:[1,2,3,4,5,6,7];
   for(const slot of choices) {
     const probe={id:'candidate',model:model.id,slot};
     const result=assess([...items,probe],models,options);
@@ -76,8 +82,8 @@ export function firstFreeSlot(model,items,models,options={}) {
 }
 
 // Snap by physical connector offset, never by equally spaced slot numbers.
-export function nearestConnector(units,mpx=false) {
-  const choices=SLOTS.filter(s=>!mpx||s.id===1||s.id===3);
+export function nearestConnector(units,mpx=false,options={}) {
+  const choices=slotsFor(options).filter(s=>!mpx||s.id===1||s.id===3);
   return choices.reduce((best,s)=>Math.abs(s.units-units)<Math.abs(best.units-units)?s:best).id;
 }
 export function checkMove(item,slot,items,models,options={}) {

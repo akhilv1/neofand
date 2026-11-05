@@ -49,7 +49,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a2000-12-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a2000-12-p620.svg"
     },
     {
       "id": "rtx-a4000",
@@ -74,7 +75,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a4000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a4000-p620.svg"
     },
     {
       "id": "rtx-a4500",
@@ -99,7 +101,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a4500-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a4500-p620.svg"
     },
     {
       "id": "rtx-a5000",
@@ -124,7 +127,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a5000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a5000-p620.svg"
     },
     {
       "id": "rtx-a5500",
@@ -149,7 +153,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a5500-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a5500-p620.svg"
     },
     {
       "id": "rtx-a6000",
@@ -174,7 +179,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-a6000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-a6000-p620.svg"
     },
     {
       "id": "rtx-2000-ada",
@@ -199,7 +205,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-2000-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-2000-ada-p620.svg"
     },
     {
       "id": "rtx-4000-sff-ada",
@@ -224,7 +231,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-4000-sff-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-4000-sff-ada-p620.svg"
     },
     {
       "id": "rtx-4000-ada",
@@ -249,7 +257,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-4000-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-4000-ada-p620.svg"
     },
     {
       "id": "rtx-4500-ada",
@@ -274,7 +283,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-4500-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-4500-ada-p620.svg"
     },
     {
       "id": "rtx-5000-ada",
@@ -299,7 +309,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-5000-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-5000-ada-p620.svg"
     },
     {
       "id": "rtx-6000-ada",
@@ -324,7 +335,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-6000-ada-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-6000-ada-p620.svg"
     },
     {
       "id": "rtx-pro-2000-blackwell",
@@ -349,7 +361,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-2000-blackwell-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-2000-blackwell-p620.svg"
     },
     {
       "id": "rtx-pro-4000-sff-blackwell",
@@ -374,7 +387,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-4000-sff-blackwell-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-4000-sff-blackwell-p620.svg"
     },
     {
       "id": "rtx-pro-4000-blackwell",
@@ -399,7 +413,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-4000-blackwell-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-4000-blackwell-p620.svg"
     },
     {
       "id": "rtx-pro-4500-blackwell",
@@ -424,7 +439,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-4500-blackwell-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-4500-blackwell-p620.svg"
     },
     {
       "id": "rtx-pro-5000-blackwell",
@@ -449,7 +465,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-5000-blackwell-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-5000-blackwell-p620.svg"
     },
     {
       "id": "rtx-pro-6000-maxq",
@@ -474,7 +491,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-6000-maxq-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-6000-maxq-p620.svg"
     },
     {
       "id": "rtx-pro-6000-workstation",
@@ -499,7 +517,8 @@
       "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/rtx-pro-6000-workstation-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/rtx-pro-6000-workstation-p620.svg"
     },
     {
       "id": "quadro-p6000",
@@ -524,7 +543,8 @@
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/quadro-p6000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/quadro-p6000-p620.svg"
     },
     {
       "id": "quadro-rtx-5000",
@@ -549,7 +569,8 @@
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/quadro-rtx-5000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/quadro-rtx-5000-p620.svg"
     },
     {
       "id": "quadro-rtx-6000",
@@ -574,7 +595,8 @@
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/quadro-rtx-6000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/quadro-rtx-6000-p620.svg"
     },
     {
       "id": "quadro-rtx-8000",
@@ -599,7 +621,8 @@
       "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "artwork_status": "A6000-based photographic family with model lettering",
       "render_preview": "models/quadro-rtx-8000-installed.svg",
-      "render_preview_label": "Photorealistic installed view \u2197"
+      "render_preview_label": "Photorealistic installed view \u2197",
+      "p620_asset": "models/quadro-rtx-8000-p620.svg"
     },
     {
       "id": "rtx-3080-fe",
@@ -636,6 +659,17 @@
           2126,
           573
         ]
+      },
+      "p620_asset": "artwork/p620/geforce-clean.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          47,
+          149,
+          2125,
+          574
+        ]
       }
     },
     {
@@ -654,24 +688,35 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thick",
-      "render_preview": "artwork/geforce-clean.png",
+      "render_preview": "artwork/rtx-3090-fe.png",
       "render_preview_label": "Clean installed render \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
+      "visual_profile_note": "Dedicated RTX 3090 Founders Edition photorealistic study based on NVIDIA product references, with Ampere angled fins and silver frame. Power cables and mounting bracket omitted; fit uses published 313 mm length and three-slot envelope.",
       "board_origin": "OEM / reference",
       "workstation_photo": false,
       "artwork_family": "fe-ampere",
       "artwork_description": "GeForce Ampere Founders Edition",
-      "installed_asset": "artwork/geforce-clean.png",
+      "installed_asset": "artwork/rtx-3090-fe.png",
       "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/30-series/rtx-3090-3090ti/",
-      "artwork_status": "rendered family profile",
+      "artwork_status": "model-specific photorealistic study",
       "raster_crop": {
         "image_width": 2172,
         "image_height": 724,
         "box": [
-          52,
-          152,
-          2126,
+          41,
+          145,
+          2138,
           573
+        ]
+      },
+      "p620_asset": "artwork/p620/rtx-3090-fe.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          35,
+          144,
+          2138,
+          574
         ]
       }
     },
@@ -710,6 +755,17 @@
           2126,
           573
         ]
+      },
+      "p620_asset": "artwork/p620/geforce-clean.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          47,
+          149,
+          2125,
+          574
+        ]
       }
     },
     {
@@ -746,6 +802,17 @@
           152,
           2126,
           573
+        ]
+      },
+      "p620_asset": "artwork/p620/geforce-clean.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          47,
+          149,
+          2125,
+          574
         ]
       }
     },
@@ -784,6 +851,17 @@
           2126,
           573
         ]
+      },
+      "p620_asset": "artwork/p620/geforce-clean.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          47,
+          149,
+          2125,
+          574
+        ]
       }
     },
     {
@@ -821,6 +899,17 @@
           2126,
           573
         ]
+      },
+      "p620_asset": "artwork/p620/geforce-clean.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          47,
+          149,
+          2125,
+          574
+        ]
       }
     },
     {
@@ -856,7 +945,18 @@
         ]
       },
       "render_preview": "artwork/geforce-blackwell.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/geforce-blackwell.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          50,
+          204,
+          2122,
+          496
+        ]
+      }
     },
     {
       "id": "rtx-5090-fe",
@@ -891,7 +991,18 @@
         ]
       },
       "render_preview": "artwork/geforce-blackwell.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/geforce-blackwell.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          50,
+          204,
+          2122,
+          496
+        ]
+      }
     },
     {
       "id": "tesla-p40",
@@ -914,7 +1025,8 @@
       "artwork_description": "Tesla Pascal passive",
       "installed_asset": "models/tesla-p40-installed.svg",
       "appearance_source": "https://images.nvidia.com/content/tesla/pdf/Tesla-P40-Product-Brief.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/tesla-p40-p620.svg"
     },
     {
       "id": "tesla-p100-pcie",
@@ -937,7 +1049,8 @@
       "artwork_description": "Tesla Pascal passive",
       "installed_asset": "models/tesla-p100-pcie-installed.svg",
       "appearance_source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v05.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/tesla-p100-pcie-p620.svg"
     },
     {
       "id": "tesla-v100-pcie",
@@ -960,7 +1073,8 @@
       "artwork_description": "Tesla Volta passive",
       "installed_asset": "models/tesla-v100-pcie-installed.svg",
       "appearance_source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v10.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/tesla-v100-pcie-p620.svg"
     },
     {
       "id": "a100-80-pcie",
@@ -983,7 +1097,8 @@
       "artwork_description": "A100 passive enclosure",
       "installed_asset": "models/a100-80-pcie-installed.svg",
       "appearance_source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/PB-10577-001_v02.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/a100-80-pcie-p620.svg"
     },
     {
       "id": "h100-pcie",
@@ -1006,7 +1121,8 @@
       "artwork_description": "H100 passive enclosure",
       "installed_asset": "models/h100-pcie-installed.svg",
       "appearance_source": "https://www.nvidia.com/content/dam/en-zz/Solutions/gtcs22/data-center/h100/PB-11133-001_v01.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/h100-pcie-p620.svg"
     },
     {
       "id": "l4",
@@ -1029,7 +1145,8 @@
       "artwork_description": "L4 low-profile passive",
       "installed_asset": "models/l4-installed.svg",
       "appearance_source": "https://images.nvidia.com/aem-dam/Solutions/Data-Center/l4/nvidia-ada-gpu-architecture-whitepaper-v2.1.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/l4-p620.svg"
     },
     {
       "id": "l40s",
@@ -1052,7 +1169,8 @@
       "artwork_description": "L40S passive",
       "installed_asset": "models/l40s-installed.svg",
       "appearance_source": "https://www.nvidia.com/en-us/data-center/l40s/",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/l40s-p620.svg"
     },
     {
       "id": "rx-7900xt",
@@ -1087,7 +1205,18 @@
         ]
       },
       "render_preview": "artwork/radeon-rx7900.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/radeon-rx7900.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          60,
+          202,
+          2112,
+          501
+        ]
+      }
     },
     {
       "id": "rx-7900xtx",
@@ -1122,7 +1251,18 @@
         ]
       },
       "render_preview": "artwork/radeon-rx7900.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/radeon-rx7900.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          60,
+          202,
+          2112,
+          501
+        ]
+      }
     },
     {
       "id": "radeon-pro-w6800",
@@ -1145,7 +1285,8 @@
       "artwork_description": "Radeon PRO blue blower",
       "installed_asset": "models/radeon-pro-w6800-installed.svg",
       "appearance_source": "https://www.amd.com/en/products/graphics/workstations/radeon-pro/w6800.html",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/radeon-pro-w6800-p620.svg"
     },
     {
       "id": "radeon-pro-w7800",
@@ -1180,7 +1321,18 @@
         ]
       },
       "render_preview": "artwork/radeon-pro-w7800.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/radeon-pro-w7800.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          40,
+          171,
+          2130,
+          537
+        ]
+      }
     },
     {
       "id": "radeon-pro-w7900-dual",
@@ -1203,7 +1355,8 @@
       "artwork_description": "Radeon PRO W7000 dark blower",
       "installed_asset": "models/radeon-pro-w7900-dual-installed.svg",
       "appearance_source": "https://www.amd.com/content/dam/amd/en/documents/partner-hub/radeon-pro/amd-radeon-pro-w7900-dual-slot-datasheet-competitive.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/radeon-pro-w7900-dual-p620.svg"
     },
     {
       "id": "instinct-mi210",
@@ -1226,7 +1379,8 @@
       "artwork_description": "AMD Instinct passive",
       "installed_asset": "models/instinct-mi210-installed.svg",
       "appearance_source": "https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/product-briefs/instinct-mi210-brochure.pdf",
-      "artwork_status": "family-specific illustration"
+      "artwork_status": "family-specific illustration",
+      "p620_asset": "models/instinct-mi210-p620.svg"
     },
     {
       "id": "arc-a770-le",
@@ -1261,7 +1415,18 @@
         ]
       },
       "render_preview": "artwork/arc-a770.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/arc-a770.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          59,
+          253,
+          2113,
+          473
+        ]
+      }
     },
     {
       "id": "arc-b580-le",
@@ -1296,7 +1461,18 @@
         ]
       },
       "render_preview": "artwork/arc-b580.png",
-      "render_preview_label": "Clean installed render \u2197"
+      "render_preview_label": "Clean installed render \u2197",
+      "p620_asset": "artwork/p620/arc-b580.png",
+      "p620_raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          46,
+          181,
+          2125,
+          530
+        ]
+      }
     },
     {
       "id": "mpx-580x",

@@ -35,3 +35,15 @@ test('over-length cards cannot be added even to an empty chassis',()=>assert.equ
 test('two MPX modules leave no third MPX placement',()=>assert.equal(firstFreeSlot(models[4],[c('a','mpx',1),c('b','mpx',3)],models),null));
 
 test('full MPX artwork fills its reserved bay without changing connector occupancy',()=>{const env=assess([c('a','mpx',1)],models).cards[0].env;assert.equal(env.thickness,4*PITCH);assert.equal(env.width,4*PITCH);assert.equal(env.estimated,true);});
+
+const p620={platform:'lenovo-p620'};
+test('P620 prefers primary GPU connector 3 then connector 1',()=>{assert.equal(firstFreeSlot(models[0],[],models,p620),3);assert.equal(firstFreeSlot(models[0],[c('a','two',3)],models,p620),1);});
+test('P620 rejects MPX independently of user length overrides',()=>{assert.equal(firstFreeSlot(models[4],[],models,p620),null);assert.match(assess([c('a','mpx',1,{length_mm:267})],models,p620).cards[0].errors.join(),/incompatible/);});
+test('P620 double-width GPU blocks immediately adjacent connector',()=>assert.equal(assess([c('a','two',3),c('b','two',4)],models,p620).pairs.length,1));
+test('P620 permits two GPUs in connectors 1 and 3',()=>assert.equal(assess([c('a','two',1),c('b','two',3)],models,p620).hasErrors,false));
+test('P620 25W positions conservatively block unverified GPU slot power',()=>{for(const slot of [2,6])assert.match(assess([c('a','two',slot)],models,p620).cards[0].errors.join(),/25 W/);});
+test('P620 capacity guard and chassis bottom reject overflow',()=>{assert.equal(firstFreeSlot(models[0],[c('a','two',1),c('b','two',3),c('c','two',5)],models,p620),null);assert.match(assess([c('a','three',5)],models,p620).cards[0].errors.join(),/beyond/);});
+test('P620 snapping uses six nominal consecutive positions',()=>{assert.equal(nearestConnector(1.2,false,p620),2);assert.equal(nearestConnector(5.8,false,p620),6);});
+test('P620 provisional length is checked and can be calibrated',()=>{assert.equal(firstFreeSlot(models[3],[],models,p620),null);assert.equal(firstFreeSlot(models[3],[],models,{...p620,bay_mm:320}),3);});
+import {compatibility} from './platforms.mjs';
+test('P620 notes preserve lack of live telemetry and cable qualification',()=>{const notes=compatibility([{model:{id:'rtx-a6000'}}],p620).join();assert.match(notes,/not connected/);assert.match(notes,/EPS12V/);});
