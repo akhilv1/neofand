@@ -18,9 +18,13 @@ def normalize(node,status,resources,tasks):
     for item in resources:
         if item.get('node')!=node or item.get('type') not in ('qemu','lxc'):continue
         guests.append({key:item.get(key) for key in ('vmid','name','type','status','cpu','maxcpu','mem','maxmem','disk','maxdisk','uptime')})
+    cached_node=next((r for r in resources if r.get('type')=='node' and (r.get('node')==node or r.get('id')=='node/'+node)),{})
+    # pvesh's one-shot node/status CPU sample can be an uninitialized zero.
+    host={k:status.get(k) for k in ('pveversion','uptime','loadavg','memory','swap','rootfs')}
+    host['cpu']=cached_node.get('cpu')
     recent=[{key:t.get(key) for key in ('type','id','starttime','endtime','status')} for t in tasks[:50]]
     return dict(timestamp=time.time(),status='ok',node=node,
-                host={k:status.get(k) for k in ('pveversion','uptime','cpu','loadavg','memory','swap','rootfs')},
+                host=host,
                 guests=sorted(guests,key=lambda g:int(g['vmid'])),tasks=recent)
 
 
@@ -28,7 +32,7 @@ def main(path):
     target=Path(path);node=socket.gethostname().split('.')[0]
     if not re.fullmatch(r'[A-Za-z0-9._-]+',node):raise ValueError('Invalid node name')
     try:
-        data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources','--type','vm'),query('/nodes/'+node+'/tasks','--limit','50'))
+        data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources'),query('/nodes/'+node+'/tasks','--limit','50'))
     except (OSError,ValueError,KeyError,subprocess.SubprocessError):
         try:data=json.loads(target.read_text())
         except (OSError,ValueError):data={'timestamp':0,'guests':[],'tasks':[],'node':node}
