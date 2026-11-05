@@ -1,4 +1,13 @@
+{
+    admin off
+    auto_https off
+}
 :8080 {
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
     @apiGet {
         path /api/*
         method GET

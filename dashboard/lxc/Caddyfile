@@ -3,6 +3,16 @@
     auto_https off
 }
 :8080 {
+    bind {$NEOFAND_LISTEN:127.0.0.1}
+    @outside not remote_ip {$NEOFAND_ALLOWED_CIDRS:127.0.0.1/32 ::1/128}
+    respond @outside "Forbidden" 403
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+    }
+    # Optional administrator-managed authentication, e.g. basic_auth behind TLS.
+    import /etc/neofand/access/*.caddy
     redir / /hardware/ 302
     redir /hardware /hardware/ 308
     handle_path /hardware/* {

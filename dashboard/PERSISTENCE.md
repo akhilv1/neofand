@@ -23,7 +23,7 @@ Example after mounting your archive share at `/mnt/neofand-archive`:
 ```sh
 python3 export_history.py \
   --source /var/lib/neofand-host \
-  --database /var/lib/neofand-host/linux.sqlite \
+  --database /var/lib/neofand-host/telemetry/linux.sqlite \
   --destination /mnt/neofand-archive \
   --mount-root /mnt/neofand-archive \
   --host pve-turret
@@ -32,3 +32,5 @@ python3 export_history.py \
 On P620, use the dashboard `telemetry/` directory and its `linux.sqlite`. On the Mac Pro, use its dashboard `telemetry/` directory plus `--database /var/lib/neofand/telemetry.db`. Run from the host with read access to those paths. Schedule with a systemd timer or your existing backup scheduler; monitor export failures. Archives are immutable, do not delete older archives automatically, and need a retention policy on the archive storage.
 
 This is centralized archival, not a shared live backend or multi-host query service. No archive destination is configured by default. To restore, stop the host collectors, extract into a temporary directory, verify the manifest, restore the database and JSON files to their original host data paths with correct ownership, then restart the collectors. Never overwrite an active SQLite database.
+
+Security: new Proxmox installations separate unprivileged sampler files in `telemetry/` from root-owned SMART state in the parent. The exporter supports both layouts. Export destinations must not be group/world writable, and each host archive directory must be exporter-owned mode `0700`; archives are `0600`. Existing archive directories can be migrated by their administrator after verifying ownership. See [SECURITY.md](../SECURITY.md).
