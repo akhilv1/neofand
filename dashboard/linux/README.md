@@ -21,3 +21,5 @@ The frontend uses shared theme, charts, ranges, auto/live controls, build stamp,
 `python3 -m unittest -v test_linux.py` verifies CPU deltas, NVIDIA units and unavailable values, bounded history and parameterized queries. Validate live samples against host nvidia-smi, /proc/meminfo and k10temp. Verify container health, API history, stale health behavior, events, storage, and existing Portainer route. Browser-check Dashboard, Sensors, Power, Thermal and Event log.
 
 To remove only this deployment: stop the neofand Compose project and neofand-linux.service / neofand-events.timer / neofand-storage.timer, then remove only the /hardware Tailscale Serve mount. Keep telemetry for recovery and leave Portainer untouched.
+
+P620 sensor callouts use numbered component anchors and leader lines calculated from the rendered chassis and card positions. On narrow screens the lines are hidden and matching numbered markers identify each card without crossing the stacked layout. Marker positions are approximate; unavailable chassis fan and total PSU readings remain unavailable.

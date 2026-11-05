@@ -46,4 +46,4 @@ test('P620 capacity guard and chassis bottom reject overflow',()=>{assert.equal(
 test('P620 snapping uses six nominal consecutive positions',()=>{assert.equal(nearestConnector(1.2,false,p620),2);assert.equal(nearestConnector(5.8,false,p620),6);});
 test('P620 provisional length is checked and can be calibrated',()=>{assert.equal(firstFreeSlot(models[3],[],models,p620),null);assert.equal(firstFreeSlot(models[3],[],models,{...p620,bay_mm:320}),3);});
 import {compatibility} from './platforms.mjs';
-test('P620 notes distinguish builder preview from live telemetry and preserve cable qualification',()=>{const notes=compatibility([{model:{id:'rtx-a6000'}}],p620).join();assert.match(notes,/separate from live host telemetry/);assert.match(notes,/EPS12V/);});
+test('P620 builder notes distinguish live telemetry and preserve cable qualification',()=>{const notes=compatibility([{model:{id:'rtx-a6000'}}],p620).join();assert.match(notes,/separate from live host telemetry/);assert.match(notes,/EPS12V/);});
