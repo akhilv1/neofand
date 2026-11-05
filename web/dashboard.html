@@ -1290,7 +1290,7 @@ async function loadBoot() {
 
 const post = (url, body) => getJSON(url, {
   method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Neofand-Control": "1" },
   body: body || ""
 });
 async function setBootNext(id) {
