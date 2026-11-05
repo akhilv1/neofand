@@ -55,7 +55,7 @@ Only the telemetry directory is mounted read-only into the memory companion; `/a
 
 ### Storage categories
 
-`storage_breakdown.py` performs a metadata-only allocated-block scan as user neo. Its systemd timer runs 30 minutes after the previous scan completes, with idle I/O priority, nice 19, and a 20% CPU quota. It never reads file contents or follows symlinks; nested host mounts are skipped, device identity is checked, and hard links are counted once per filesystem. A scan has an 1100-second budget and explicitly marks incomplete results.
+`storage_breakdown.py` performs a metadata-only allocated-block scan as user neo. Its systemd timer runs 30 minutes after the previous scan completes, with idle I/O priority, nice 19, and a 50% of one CPU quota. It never reads file contents or follows symlinks; nested host mounts are skipped, device identity is checked, and hard links are counted once per filesystem. A scan has an 1100-second budget and explicitly marks incomplete results.
 
 Categories use folder and extension heuristics: backup folders take precedence, model folders and formats (including Hugging Face/Ollama caches) are Models; remaining files are classified as media, archives, development files, containers, caches/logs, documents, system, or Other. Values use allocated blocks, not logical sizes. Shared copy-on-write extents and concurrent writes can make file estimates differ from filesystem used space; the UI flags overestimates and shows positive remainder as Unclassified & overhead. Protected files cannot be classified by this unprivileged scan. Unmounted partitions remain unavailable.
 

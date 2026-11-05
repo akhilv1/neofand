@@ -57,7 +57,9 @@
         });
         return card;
       });
+      const expanded=new Set([...host.querySelectorAll('details[open]')].map(e=>e.dataset.storageKey));
       host.replaceChildren(...cards);
+      host.querySelectorAll('details').forEach(e=>{e.open=expanded.has(e.dataset.storageKey);});
       if(!cards.length)host.append(make('p','','No physical drives detected.'));
       const summary=document.getElementById('storage-summary'); summary.replaceChildren();
       for(const [label,value] of [['Physical drives',String(data.drives.length)],['Raw capacity',bytes(totals.raw)],['Measured used',bytes(totals.used)],['Available on mounted filesystems',bytes(totals.available)]]){

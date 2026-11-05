@@ -26,6 +26,7 @@
     const legend=make('div','storage-category-legend');
     for(const c of segments){
       const row=make(c.folders?.length?'details':'div','storage-category');
+      row.dataset.storageKey=`${scan.filesystem_id}:${c.name}`;
       const line=make(c.folders?.length?'summary':'div','storage-category-line');
       const dot=make('i');dot.style.background=colors[c.name]||colors.Other;
       line.append(dot,make('span','',c.name),make('strong','',bytes(c.bytes)));
@@ -39,7 +40,7 @@
     if(age>5400||!scan.complete)stamp.classList.add('storage-warning');box.append(stamp);
     if(scan.unreadable_entries)box.append(make('p','storage-note',`${scan.unreadable_entries.toLocaleString()} entries could not be read. Unclassified space includes protected files and filesystem overhead.`));
     if(allocated>u.used_bytes)box.append(make('p','storage-note storage-warning','Allocated file estimates exceed current filesystem usage. Shared extents or files changing during the scan can cause this; segment proportions are estimates.'));
-    if(scan.largest_folders?.length){const details=make('details','storage-largest');details.append(make('summary','','Largest folders on this filesystem'),folderList(scan.largest_folders));box.append(details);}
+    if(scan.largest_folders?.length){const details=make('details','storage-largest');details.dataset.storageKey=`${scan.filesystem_id}:largest`;details.append(make('summary','','Largest folders on this filesystem'),folderList(scan.largest_folders));box.append(details);}
     return box;
   }
   window.neofandStorageBreakdown=breakdown;
