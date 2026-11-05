@@ -349,9 +349,9 @@
       <label for="range" id="range-label">Range</label>
       <select id="range">
         <option value="3600">Last hour</option>
-        <option value="21600" selected>Last 6 hours</option>
+        <option value="21600">Last 6 hours</option>
         <option value="86400">Last 24 hours</option>
-        <option value="604800">Last 7 days</option>
+        <option value="604800" selected>Last 7 days</option>
         <option value="2592000">Last 30 days</option>
         <option value="31536000">Last year</option>
       </select>
@@ -590,9 +590,9 @@
           <div class="sub">
             Discrete channels are stored with a zero deadband, so every transition is captured even
             between samples. <code>PZ*T</code> = a power zone over budget · <code>GTHR</code> = SMC
-            GPU throttle · <code>MSCO</code> = chassis cover removed.
+            GPU throttle · <code>MSCO</code> = chassis cover removed. Ubuntu warnings/errors, boot history and available UPS events are included. An unexpected restart is not proof of a power outage.
           </div>
-          <div class="tw" id="events"><div class="empty">loading</div></div>
+          <label>Event source <select id="event-source"><option value="all">All sources</option><option value="hardware">Hardware transitions</option><option value="ubuntu">Ubuntu warnings / errors</option><option value="boot">Boots / shutdowns</option><option value="power">UPS / power events</option></select></label><p class="sub" id="event-status" role="status"></p><div class="tw" id="events"><div class="empty">loading</div></div>
         </div>
       </section>
     </div>
@@ -667,6 +667,8 @@ const slot = (i) => css(SLOTS[i % SLOTS.length]);
 
 const $ = (id) => document.getElementById(id);
 const state = { metrics: [], latest: [], timer: null, tab: "overview", whoami: null, charts: {} };
+const PAGE_RANGES={overview:604800,power:604800,thermal:21600,errors:2592000};
+state.ranges={...PAGE_RANGES};
 const rangeSecs = () => parseInt($("range").value, 10);
 const fmtTime = (t) => new Date(t * 1000).toLocaleString();
 const fmtClock = (t) => {
@@ -1320,19 +1322,38 @@ function renderSummary() {
   hdr.className = s.className;
 }
 
+let eventRequest=0;
 async function loadEvents() {
-  try {
-    const hours = Math.max(1, Math.round(rangeSecs() / 3600));
-    const d = await getJSON(`/hardware/api/events?hours=${hours}`);
-    if (!d.events.length) { putEmpty($("events"), "No trips or transitions in this window — nothing went over budget."); return; }
-    put($("events"), table(["Time", "Channel", "State"],
-      d.events.map(e => [
-        fmtTime(e.ts),
-        { node: (() => { const c = el("code"); c.textContent = e.name; return c; })() },
-        { node: statusEl(e.state === "asserted" ? "warn" : "good", e.state === "asserted" ? "Asserted" : "Cleared") }
-      ])));
-  } catch (e) { putEmpty($("events"), "Error: " + e.message); }
+  const request=++eventRequest,seconds=rangeSecs(),from=Date.now()/1000-seconds;
+  const results=await Promise.allSettled([
+    getJSON(`/hardware/api/events?hours=${Math.max(1,Math.round(seconds/3600))}`),
+    getJSON('/hardware/api/host-events')
+  ]);
+  if(request!==eventRequest)return;
+  let events=[],notes=[];
+  if(results[0].status==='fulfilled')events.push(...(results[0].value.events||[]).map(e=>({ts:e.ts,kind:'hardware',unit:e.name,title:e.state==='asserted'?'Asserted':'Cleared',message:'Hardware state transition',severity:e.state==='asserted'?'warning':'info',confidence:'recorded'})));
+  else notes.push('Hardware transitions unavailable.');
+  if(results[1].status==='fulfilled'){
+    const d=results[1].value;events.push(...(d.events||[]));
+    if(d.status!=='ok'||!d.timestamp||Date.now()/1000-d.timestamp>180)notes.push('Ubuntu snapshot unavailable or stale; retained records are shown.');
+    else notes.push('Ubuntu sampled '+fmtTime(d.timestamp)+'.');
+    notes.push(...(d.warnings||[]));
+    if(from<d.window_start)notes.push('Ubuntu history is retained for up to 30 days.');
+    if(!d.ups_records)notes.push('No UPS records found; power outages cannot be confirmed from reboot history alone.');
+  }else notes.push('Ubuntu journal snapshot unavailable.');
+  const filter=$('event-source').value;
+  events=events.filter(e=>Number.isFinite(e.ts)&&e.ts>=from&&(filter==='all'||e.kind===filter)).sort((a,b)=>b.ts-a.ts);
+  const shown=events.slice(0,500);
+  notes.unshift(`${events.length} matching events${events.length>500?' · showing newest 500; narrow the range or source':''}.`);
+  $('event-status').textContent=notes.join(' ');
+  if(!shown.length){putEmpty($('events'),'No matching events in the available history.');return;}
+  put($('events'),table(['Time','Source / unit','Event','Details'],shown.map(e=>[
+    fmtTime(e.ts),e.unit||e.source||e.kind,
+    {node:statusEl(e.severity==='error'?'crit':e.severity==='warning'?'warn':'good',e.title+(e.confidence==='inferred'?' · inferred':''))},
+    e.message
+  ])));
 }
+$('event-source').addEventListener('change',loadEvents);
 
 async function loadServices() {
   try {
@@ -1559,6 +1580,7 @@ function applyVisibility() {
 const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];
 function selectTab(name) {
   state.tab = name;
+  if(state.ranges[name])$("range").value=String(state.ranges[name]);
   const historical = ['overview','power','thermal','errors'].includes(name);
   $('range').hidden = !historical;
   $('range-label').hidden = !historical;
@@ -1620,7 +1642,7 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 }));
 
 $("refresh").addEventListener("click", refresh);
-$("range").addEventListener("change", refresh);
+$("range").addEventListener("change",()=>{state.ranges[state.tab]=rangeSecs();refresh();});
 let rz;
 window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(refresh, 250); });
 
@@ -1633,7 +1655,7 @@ window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(refr
  * loaded any data at all. Everything downstream looked "dead" for a reason that
  * had nothing to do with the charts. */
 const requestedTab = location.hash.slice(1);
-if (TABS.includes(requestedTab)) selectTab(requestedTab);
+selectTab(TABS.includes(requestedTab)?requestedTab:"overview");
 refresh();
 try {
   const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");

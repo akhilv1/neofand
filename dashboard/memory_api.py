@@ -34,11 +34,13 @@ def snapshot():
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path not in ('/memory', '/storage'):
+        if self.path not in ('/memory', '/storage', '/events'):
             self.send_error(404)
             return
         try:
-            data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/storage.json').read_text())
+            data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/'+('system-events.json' if self.path=='/events' else 'storage.json')).read_text())
+            if self.path == '/events':
+                data.pop('boot_evidence',None)
             if self.path == '/storage':
                 try:
                     data['breakdown'] = json.loads(Path('/host/telemetry/storage-breakdown.json').read_text())
@@ -50,7 +52,7 @@ class Handler(BaseHTTPRequestHandler):
                     data['index_progress'] = None
             body = json.dumps(data, allow_nan=False).encode()
         except (OSError, ValueError, KeyError):
-            self.send_error(503, 'Host memory readings unavailable')
+            self.send_error(503, 'Host telemetry unavailable')
             return
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')

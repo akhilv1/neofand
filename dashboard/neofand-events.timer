@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Ubuntu hardware dashboard events
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=neofand-events.service
+
+[Install]
+WantedBy=timers.target
