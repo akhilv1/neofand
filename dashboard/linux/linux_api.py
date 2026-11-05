@@ -1,13 +1,14 @@
 """Container HTTP reader for host-written telemetry; no control endpoints."""
 import json
 import math
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sqlite3
 import time
 from urllib.parse import urlparse, parse_qs
 
-DATA=Path('/host/telemetry')
+DATA=Path(os.environ.get('NEOFAND_DATA_DIR','/host/telemetry'))
 
 def snapshot():
     return json.loads((DATA/'linux.json').read_text())
@@ -36,6 +37,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/series': data=series(parse_qs(url.query),DATA/'linux.sqlite')
             elif path=='/api/host-events':
                 data=json.loads((DATA/'system-events.json').read_text());data.pop('boot_evidence',None)
+            elif path=='/api/proxmox': data=json.loads((DATA/'proxmox.json').read_text())
             elif path=='/api/host-storage': data=json.loads((DATA/'storage.json').read_text())
             elif path=='/api/events': data={'events':[]}
             elif path in ('/api/latest','/api/metrics','/api/host-memory','/api/host-info','/health'):
@@ -46,7 +48,7 @@ class Handler(BaseHTTPRequestHandler):
                 elif path=='/health':
                     if time.time()-snap['timestamp']>30: self.send_error(503,'Host sampler stale');return
                     data={'status':'ok'}
-                else: data={k:v for k,v in snap.items() if k not in ('latest','memory')}
+                else: data={**{k:v for k,v in snap.items() if k not in ('latest','memory')},'proxmox_available':(DATA/'proxmox.json').exists()}
             else: self.send_error(404);return
             body=json.dumps(data,allow_nan=False).encode()
         except (OSError,sqlite3.Error): self.send_error(503,'Host telemetry unavailable');return
@@ -56,4 +58,4 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
     def log_message(self,*args): pass
 
-if __name__=='__main__': ThreadingHTTPServer(('0.0.0.0',8080),Handler).serve_forever()
+if __name__=='__main__': ThreadingHTTPServer((os.environ.get('NEOFAND_BIND','0.0.0.0'),int(os.environ.get('NEOFAND_PORT','8080'))),Handler).serve_forever()

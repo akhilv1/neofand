@@ -15,6 +15,7 @@
   function drawConnectors(){
     frame=0;
     if(!visual||!chassis)return;
+    if(document.querySelector('.p620-chassis').hidden){overlay.replaceChildren();return;}
     const area=visual.getBoundingClientRect(),image=chassis.getBoundingClientRect();
     if(!area.width||!area.height||!image.width)return;
     overlay.setAttribute('viewBox',`0 0 ${area.width} ${area.height}`);
@@ -39,12 +40,21 @@
     if(window.ResizeObserver){const observer=new ResizeObserver(scheduleConnectors);observer.observe(visual);observer.observe(chassis);for(const card of visual.querySelectorAll('.p620-callout'))observer.observe(card);}
     chassis.addEventListener('load',scheduleConnectors);window.addEventListener('resize',scheduleConnectors);scheduleConnectors();
   }
+  window.neofandHostConnected=info=>{
+    set('host-title',info.host.display_name||info.host.product_family||info.host.product_version||'Linux host');
+    set('host-detail',info.host.hostname+' · '+info.host.cpu);
+    set('cpu-name','CPU');set('gpu-name',info.gpus?.[0]?.name||'GPU unavailable');
+    const p620=info.host.platform==='lenovo-p620';
+    document.querySelector('.p620-chassis').hidden=!p620;
+    overlay.style.display=p620?'':'none';
+    visual.style.gridTemplateColumns=p620?'':'1fr';scheduleConnectors();
+  };
   let request=0;
   window.neofandDiagramUpdate=async latest=>{
     scheduleConnectors();
     const own=++request;
     const metric=(sub,name)=>latest.find(m=>m.subsystem===sub&&m.name===name)?.value;
-    const cpu=latest.filter(m=>m.subsystem==='hwmon'&&/^k10temp.*Tctl/.test(m.name));
+    const cpu=latest.filter(m=>m.subsystem==='hwmon'&&/^(k10temp.*Tctl|coretemp.*Package)/.test(m.name));
     const cpuLoad=metric('host','cpu_pct'),gpuLoad=metric('gpu','gpu0_util_gpu_pct');
     set('cpu-temp',number(cpu[0]?.value,' °C',1));set('cpu-load',number(cpuLoad,' %',1));
     set('gpu-temp',number(metric('gpu','gpu0_temp_c'),' °C'));set('gpu-load',number(gpuLoad,' %',1));

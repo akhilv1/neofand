@@ -1,14 +1,14 @@
 # Linux / ThinkStation P620 dashboard
 
-The Linux adapter collects CPU utilization, RAM/PSI, NVIDIA telemetry and readable hwmon temperatures without the Mac Pro SMC daemon. It never writes fan controls or firmware settings. The P620 identity is selected from DMI product family/version, not product_name; cheese reports `HPW (QEB2022B)` but both family/version identify ThinkStation P620.
+The Linux adapter collects CPU utilization, RAM/PSI, NVIDIA telemetry and readable hwmon temperatures without the Mac Pro SMC daemon. It never writes fan controls or firmware settings. The P620 identity is selected from DMI product family/version, not product_name; the verified P620 reports `HPW (QEB2022B)` but both family/version identify ThinkStation P620.
 
-Host: cheese / cheese.west-scoville.ts.net (100.96.103.107), Lenovo board 1046, S07KT6BA BIOS, Threadripper PRO 3945WX, 64 GB installed RAM and an RTX 3090 reported by NVIDIA at PCI 0000:61:00.0. Physical connector mapping and exact board vendor/variant remain unverified. Firmware slot descriptors do not map cleanly onto the six connector numbers. Sensor art uses an explicitly illustrative Founders Edition board in the primary GPU area.
+Verified hardware: ThinkStation P620, Threadripper PRO 3945WX, 64 GB installed RAM and an RTX 3090 reported by NVIDIA. Physical connector mapping and exact board vendor/variant remain unverified. Firmware slot descriptors do not map cleanly onto the six connector numbers. Sensor art uses an explicitly illustrative Founders Edition board in the primary GPU area.
 
 ## Deployment
 
-Use the shared dashboard assets and `build_p620.py ../index.html DEST/index.html` to create the Linux page. Copy p620.js/css to DEST/assets and linux_api.py/linux_telemetry.py to DEST. Use this directory's Compose and Caddyfile. UID 1000 is the verified neo user on cheese; adjust it for another host.
+Use the shared dashboard assets and `build_p620.py ../index.html DEST/index.html` to create the Linux page. Copy p620.js/css to DEST/assets and linux_api.py/linux_telemetry.py to DEST. Use this directory's Compose and Caddyfile. Set the Compose UID/GID and host service user to your dedicated collector account.
 
-The host `neofand-linux.service` updates an atomic JSON snapshot every two seconds and persists samples every 30 seconds to telemetry/linux.sqlite. History is retained for 30 days and begins at deployment. hourly deletes reuse freed SQLite pages; the database is not vacuumed while sampling. The API container reads the telemetry directory through a read-only mount and opens SQLite in read-only mode. No Docker socket or GPU device is mounted. Nvidia queries run as neo on the host. If a sample fails, old timestamps remain so the frontend shows a delay. Container health fails after 30 seconds without a sample.
+The host `neofand-linux.service` updates an atomic JSON snapshot every two seconds and persists samples every 30 seconds to telemetry/linux.sqlite. History is retained for 30 days and begins at deployment. hourly deletes reuse freed SQLite pages; the database is not vacuumed while sampling. The API container reads the telemetry directory through a read-only mount and opens SQLite in read-only mode. No Docker socket or GPU device is mounted. NVIDIA queries run as the collector account on the host. If a sample fails, old timestamps remain so the frontend shows a delay. Container health fails after 30 seconds without a sample.
 
 Reuse the dashboard's Ubuntu event and storage collectors/timers. Journal snapshots are bounded to 30 days / 2000 warnings/errors, plus boot and UPS evidence. A missing clean shutdown is an inferred unexpected restart, never a confirmed power outage. No UPS integration is assumed.
 

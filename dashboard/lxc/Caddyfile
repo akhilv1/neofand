@@ -1,0 +1,24 @@
+{
+    admin off
+    auto_https off
+}
+:8080 {
+    redir / /hardware/ 302
+    redir /hardware /hardware/ 308
+    handle_path /hardware/* {
+        @apiGet {
+            path /api/*
+            method GET
+        }
+        handle @apiGet {
+            reverse_proxy 127.0.0.1:4792
+        }
+        handle /api/* {
+            respond "Method not allowed" 405
+        }
+        handle {
+            root * /opt/neofand/www
+            file_server
+        }
+    }
+}

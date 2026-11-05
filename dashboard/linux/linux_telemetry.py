@@ -92,9 +92,10 @@ def collect(previous):
     except (OSError,ValueError,subprocess.SubprocessError): warnings.append('NVIDIA telemetry unavailable for this sample.')
     dmi='/sys/class/dmi/id/'
     family=read(dmi+'product_family'); version=read(dmi+'product_version')
+    display=next((v for v in (family,version,read(dmi+'product_name')) if v and v.lower() not in ('default string','to be filled by o.e.m.','system product name','system version')),'Linux host')
     platform='lenovo-p620' if 'ThinkStation P620' in (family,version) else 'linux'
     return current,dict(timestamp=now,latest=metrics,memory=memory,gpus=gpus,warnings=warnings,
-                        host=dict(hostname=read('/proc/sys/kernel/hostname'),platform=platform,product_family=family,
+                        host=dict(hostname=read('/proc/sys/kernel/hostname'),platform=platform,display_name=display,product_family=family,
                                   product_version=version,product_name=read(dmi+'product_name'),vendor=read(dmi+'sys_vendor'),
                                   cpu=next((x.split(':',1)[1].strip() for x in read('/proc/cpuinfo').splitlines() if x.startswith('model name')),'Unknown'),
                                   boot_id=read('/proc/sys/kernel/random/boot_id'),uptime_seconds=float(read('/proc/uptime','0').split()[0])))
