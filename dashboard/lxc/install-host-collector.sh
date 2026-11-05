@@ -60,6 +60,33 @@ OnUnitActiveSec=15s
 WantedBy=timers.target
 UNIT
 done
+if command -v pvesh >/dev/null; then
+  install -m 644 "$script_dir/proxmox_collect.py" /opt/neofand-host/
+  cat > /etc/systemd/system/neofand-host-proxmox.service <<'UNIT'
+[Unit]
+Description=Read-only local Proxmox inventory snapshot
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /opt/neofand-host/proxmox_collect.py /var/lib/neofand-host/proxmox.json
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/neofand-host
+TimeoutStartSec=90
+UMask=0022
+UNIT
+  cat > /etc/systemd/system/neofand-host-proxmox.timer <<'UNIT'
+[Unit]
+Description=Refresh Proxmox inventory
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now neofand-host-proxmox.timer
+fi
 systemctl daemon-reload
 systemctl enable --now neofand-host.service neofand-host-events.timer neofand-host-storage.timer
 printf '\nCollector started. Bind ONLY /var/lib/neofand-host into the LXC read-only.\n'
