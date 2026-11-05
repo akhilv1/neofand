@@ -10,7 +10,7 @@ export const platformFor=(options={})=>PLATFORMS[options.platform]||PLATFORMS['m
 export const slotsFor=(options={})=>platformFor(options).slots;
 export function compatibility(cards,options={}){
  const p=platformFor(options);if(p.id!=='lenovo-p620')return [];
- const notes=['P620 preview only · Ubuntu telemetry not connected.','1000 W PSU rating is for the whole system, not a GPU power budget. Check the exact Lenovo cable kit and power configuration.'];
+ const notes=['Builder preview · positions and compatibility are separate from live host telemetry.','1000 W PSU rating is for the whole system, not a GPU power budget. Check the exact Lenovo cable kit and power configuration.'];
  if(cards.length)notes.push('Mechanical fit does not confirm firmware, driver, power or cooling support. GPU height, connector bends and drive-cage clearance need measurement.');
  if(cards.some(c=>c.model?.id==='rtx-a6000'))notes.push('Lenovo documents up to two RTX A6000 cards with the specified EPS12V adapter wiring. Do not substitute a PCIe 8-pin lead for EPS12V.');
  if(cards.filter(c=>c.model?.id==='rtx-a6000').length>2)notes.push('This exceeds Lenovo’s documented dual-A6000 configuration.');

@@ -1,0 +1,38 @@
+name: neofand
+services:
+  dashboard:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports: ["127.0.0.1:4791:8080"]
+    tmpfs: [/config, /data]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./index.html:/srv/index.html:ro
+      - ./assets:/srv/assets:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  telemetry:
+    image: python:3.12-alpine
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    mem_limit: 128m
+    cpus: 0.5
+    volumes:
+      - ./linux_api.py:/app/linux_api.py:ro
+      - ./telemetry:/host/telemetry:ro
+    command: ["python", "-B", "/app/linux_api.py"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

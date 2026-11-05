@@ -1,7 +1,7 @@
 import {SLOTS,assess,firstFreeSlot,nearestConnector,checkMove} from './fit.mjs?v=p620-1';
 const $=id=>document.getElementById(id);
 import {PLATFORMS,platformFor,slotsFor,compatibility} from './platforms.mjs';
-let platformId='macpro-7-1';
+let platformId=document.documentElement.dataset.platform||'macpro-7-1';
 const layouts=new Map();
 const profile=()=>PLATFORMS[platformId];
 const slots=()=>profile().slots;

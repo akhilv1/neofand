@@ -1,0 +1,15 @@
+[Unit]
+Description=Read-only Linux hardware sampler for NeoCharge
+After=multi-user.target
+[Service]
+User=neo
+ExecStart=/usr/bin/python3 -B /home/neo/services/neofand-dashboard/linux_telemetry.py /home/neo/services/neofand-dashboard/telemetry
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/home/neo/services/neofand-dashboard/telemetry
+[Install]
+WantedBy=multi-user.target
