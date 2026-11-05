@@ -1,0 +1,13 @@
+[Unit]
+Description=NeoCharge hardware dashboard
+After=network.target neofand-api.service
+[Service]
+User=neofand
+Group=neofand
+Environment=HOME=/var/lib/neofand
+ExecStart=/usr/bin/caddy run --config /etc/neofand/Caddyfile --adapter caddyfile
+Restart=on-failure
+NoNewPrivileges=true
+UMask=0022
+[Install]
+WantedBy=multi-user.target
