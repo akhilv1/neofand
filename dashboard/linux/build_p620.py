@@ -7,10 +7,10 @@ root=Path(__file__).resolve().parent
 source=Path(sys.argv[1]);output=Path(sys.argv[2])
 html=source.read_text()
 html=html.replace('id="hostline">neo-mac-pro','id="hostline">Lenovo ThinkStation P620 · cheese')
-html=html.replace('</head>','<link rel="stylesheet" href="/hardware/assets/p620.css">\n</head>')
+html=html.replace('</head>','<link rel="stylesheet" href="/hardware/assets/p620.css?v=20261105-callouts1">\n</head>')
 start=html.index('    <div id="tab-sensors"');end=html.index('    <div id="tab-errors"',start)
 html=html[:start]+(root/'p620-sensors.html').read_text()+'\n'+html[end:]
-html=html.replace('/hardware/assets/sensor-diagram.js?v=20261104-7','/hardware/assets/p620.js')
+html=html.replace('/hardware/assets/sensor-diagram.js?v=20261104-7','/hardware/assets/p620.js?v=20261105-callouts1')
 html=html.replace('/^coretemp/','/^(coretemp|k10temp)/').replace('/^(coretemp|pch|acpitz)/','/^(coretemp|k10temp|pch|acpitz)/')
 html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];','const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors"];')
 # No service/boot/control requests on this read-only Linux adapter.
