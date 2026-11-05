@@ -1,0 +1,25 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {assess,firstFreeSlot,dimensions,PITCH} from './fit.mjs';
+const models=[
+ {id:'two',name:'Two-slot',length_mm:267,thickness_mm:40,slots:2},
+ {id:'three',name:'Three-slot',length_mm:304,thickness_mm:61,slots:3},
+ {id:'unknown',name:'Unknown width',length_mm:267,thickness_mm:null,slots:2},
+ {id:'long',name:'Long card',length_mm:313,thickness_mm:40,slots:2},
+ {id:'mpx',name:'MPX',category:'Apple MPX',module_class:'full',length_mm:null,thickness_mm:null}
+];
+const c=(id,model,slot,extra={})=>({id,model,slot,...extra});
+test('double-wide connector spacing fits adjacent two-slot cards',()=>assert.equal(assess([c('a','two',1),c('b','two',2)],models).hasErrors,false));
+test('three-slot card blocks next double-wide connector',()=>assert.equal(assess([c('a','three',1),c('b','two',2)],models).pairs.length,1));
+test('three-slot placement in slots 1 and 3 has clearance',()=>assert.equal(assess([c('a','three',1),c('b','three',3)],models).hasErrors,false));
+test('three-slot slot5 covers single-wide slots6 and7',()=>assert.equal(assess([c('a','three',5),c('b','two',6)],models).pairs.length,1));
+test('rounding 60.96 to61 does not falsely collide with IO',()=>assert.equal(assess([c('a','three',5)],models).hasErrors,false));
+test('slot7 dual card collides with reservedIO',()=>assert.match(assess([c('a','two',7)],models).cards[0].errors.join(),/I\/O/));
+test('long card exceeds305mm bay',()=>assert.match(assess([c('a','long',1)],models).cards[0].errors.join(),/8.0 mm/));
+test('MPX reserves slots1and2 even with three-slot visualbody',()=>assert.equal(assess([c('a','mpx',1),c('b','two',2)],models).pairs.length,1));
+test('two MPX bays allowed; invalid start rejected',()=>{assert.equal(assess([c('a','mpx',1),c('b','mpx',3)],models).hasErrors,false);assert.equal(assess([c('a','mpx',2)],models).hasErrors,true);});
+test('unpublished width remains uncertain until measured',()=>{assert.equal(dimensions(models[2]).estimated,true);assert.equal(dimensions(models[2],{thickness_mm:41}).estimated,false);});
+test('auto placement skips collision',()=>assert.equal(firstFreeSlot(models[0],[c('a','three',1)],models),3));
+test('nominal pitch remains20.32 and gap is checked',()=>{assert.equal(PITCH,20.32);assert.equal(assess([c('a','two',1),c('b','two',2)],models,{gap_mm:2}).hasErrors,true);});
+
+test('calibrated pitch controls unknown nominal thickness and reserved width',()=>{const env=assess([c('a','unknown',1)],models,{pitch_mm:21}).cards[0].env;assert.equal(env.thickness,42);assert.equal(env.width,42);});

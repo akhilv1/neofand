@@ -16,10 +16,10 @@
     $('family').textContent=`${model.vendor} · ${model.category}`;
     $('name').textContent=model.name; $('variant').textContent=model.variant;
     const path=`models/${model.id}-${view}.svg`;
-    const rendered = view === 'edge' && model.render_preview;
+    const rendered = view === 'edge' && model.installed_asset;
     $('model-image').src=rendered || path;
     $('model-image').alt=rendered ? `${model.name} illustrative installed profile` : `${model.name} ${view} schematic`;
-    $('preview-caption').textContent=rendered ? 'Illustrative installed profile · published dimensions below' : 'Schematic artwork · dimensional envelope';
+    $('preview-caption').textContent=rendered ? `${model.artwork_description} · ${model.artwork_status}` : 'Schematic artwork · dimensional envelope';
     $('source').href=sourceLink(model.source); $('download').href=path;
     for (const [id,key] of [['render-preview','render_preview'],['chassis-reference','chassis_reference']]) {
       const link=$(id); link.hidden=!model[key]; if(model[key])link.href=model[key];
@@ -33,6 +33,7 @@
     document.querySelectorAll('.model-button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===model.id)));
     occupancy();
     history.replaceState(null,'',`#${encodeURIComponent(model.id)}`);
+    window.dispatchEvent(new CustomEvent('neofand-model-selected',{detail:{id:model.id}}));
   }
   function renderList() {
     const term=$('search').value.toLowerCase();
@@ -44,6 +45,7 @@
   ['face','edge'].forEach(v=>$(v).addEventListener('click',()=>{view=v;['face','edge'].forEach(x=>$(x).setAttribute('aria-pressed',String(x===v)));if(selected)renderSelected(selected);}));
   ['search','vendor','category'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',renderList));
   $('bay-length').addEventListener('input',occupancy);
+  $('add-selected').addEventListener('click',()=>{if(selected){window.dispatchEvent(new CustomEvent('neofand-add-to-build',{detail:{id:selected.id}}));document.getElementById('system-builder').scrollIntoView({behavior:'smooth'});}});
   fetch('catalog.json').then(r=>{if(!r.ok)throw new Error('Catalog unavailable');return r.json();}).then(data=>{
     models=data.models.filter(m=>/^[a-z0-9-]+$/.test(m.id));
     ['vendor','category'].forEach(id=>[...new Set(models.map(m=>m[id]))].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;$(id).append(o);}));

@@ -105,54 +105,76 @@ for profile in VISUAL_PROFILES:
             if model['id'] in {'rtx-4080-fe','rtx-4080s-fe'}:
                 model['visual_profile_note'] += ' Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card.'
 
-def fan(cx, cy, radius):
-    blades=''.join(f'<path d="M{cx} {cy-radius*.2} Q{cx+radius*.8} {cy-radius*.8} {cx+radius*.9} {cy} L{cx+radius*.25} {cy+radius*.2}Z" transform="rotate({angle} {cx} {cy})" fill="#3d454b"/>' for angle in range(0,360,30))
-    return f'<circle cx="{cx}" cy="{cy}" r="{radius}" fill="#11171b" stroke="#667078" stroke-width=".6"/>{blades}<circle cx="{cx}" cy="{cy}" r="{radius*.23}" fill="#687178"/>'
+# Keep partner-board variants in an optional data archive, not the OEM builder.
+PARTNER_IDS={'rtx-3060-ventus','rtx-4060ti-ventus','rtx-5060ti-ventus','rtx-4070tis-ventus','rtx-5070ti-ventus','radeon-ai-pro-r9700','arc-pro-b60-blower','arc-pro-b60-passive'}
+PARTNER_MODELS=[m for m in MODELS if m['id'] in PARTNER_IDS]
+MODELS=[m for m in MODELS if m['id'] not in PARTNER_IDS]
+for model in MODELS: model['board_origin']='OEM / reference'
+for profile in VISUAL_PROFILES: profile['models']=[id for id in profile['models'] if id not in PARTNER_IDS]
 
-def svg(model, edge=False):
-    length = model['length_mm'] or 305
-    known = model['thickness_mm'] if edge else model['height_mm']
+from appearance import FAMILIES, LABELS, draw
+from PIL import Image
+RASTER_MAP = {
+ 'rtx-a6000':'rtx-a6000.png',
+ 'rtx-pro-6000-workstation':'rtx-pro6000-workstation.png',
+ 'rtx-3080-fe':'geforce-clean.png','rtx-3090-fe':'geforce-clean.png','rtx-3090ti-fe':'geforce-clean.png',
+ 'rtx-4080-fe':'geforce-clean.png','rtx-4080s-fe':'geforce-clean.png','rtx-4090-fe':'geforce-clean.png',
+ 'rtx-5080-fe':'geforce-blackwell.png','rtx-5090-fe':'geforce-blackwell.png',
+ 'rtx-4060ti-ventus':'msi-ventus-black.png',
+ 'radeon-pro-w7800':'radeon-pro-w7800.png',
+ 'rx-7900xt':'radeon-rx7900.png','rx-7900xtx':'radeon-rx7900.png',
+ 'arc-a770-le':'arc-a770.png','arc-b580-le':'arc-b580.png',
+}
+
+
+def geometry(model, edge=False):
+    length=model['length_mm'] or 305
+    known=model['thickness_mm'] if edge else model['height_mm']
     if edge:
-        height = known or (80 if model['style']=='mpx-full' else 40 if model['style']=='mpx-half' else (model['slots'] or 2)*20.32)
+        height=known or ((3 if model.get('module_class')=='full' else 2)*20.32 if model['category']=='Apple MPX' else (model['slots'] or 2)*20.32)
     else:
-        height = known or (145 if model['style'].startswith('mpx') else 111.76)
-    title=escape(model['name']); width=length+32; view_height=height+45
-    color='#334a5c' if model['vendor']=='Intel' else '#25354c' if model['vendor']=='AMD' else '#272e32'
-    body=f'<rect x="1" y="1" width="{length-2}" height="{height-2}" rx="3" fill="url(#body)" stroke="#59646b" stroke-width=".6"/>'
-    style=model['style']
-    if style.startswith('mpx'):
-        body+=f'<path d="M5 7 H{length-5} M5 {height-7} H{length-5}" stroke="#101416" stroke-width="3"/>'
-        body+=f'<path d="M6 10 H{length-6} M6 {height-10} H{length-6}" stroke="#44494c" stroke-width=".8"/>'
-        body+=f'<circle cx="{length-13}" cy="{height*.74}" r="2.8" fill="none" stroke="#777e81" stroke-width=".5"/>'
-    elif edge:
-        body+=f'<rect x="9" y="{height*.38}" width="{length-18}" height="{height*.43}" rx="1.5" fill="url(#fins)"/>'
-    elif style=='passive':
-        body+=''.join(f'<path d="M12 {y} H{length-12}" stroke="#76817d" stroke-width="1.2"/>' for y in range(10,int(height)-10,3))
-    elif style=='blower':
-        body+=f'<rect x="{height*.92}" y="{height*.22}" width="{max(10,length-height*1.05)}" height="{height*.55}" rx="2" fill="url(#fins)"/>'
-        body+=fan(height*.47,height*.50,height*.34)
-    elif model['id'] in {'rtx-3080-fe','rtx-3090-fe','rtx-3090ti-fe','rtx-4080-fe','rtx-4080s-fe','rtx-4090-fe'}:
-        body+=''.join(f'<path d="M{length*.53} {y} H{length-7}" stroke="#596166" stroke-width=".7"/>' for y in range(7,int(height)-6,3))
-        body+=fan(length*.24,height*.50,height*.40)
-        body+=f'<path d="M5 4 H{length*.40} L{length*.59} {height*.5} L{length*.40} {height-4} H5 M{length-5} 4 H{length*.68} L{length*.49} {height*.5} L{length*.68} {height-4} H{length-5}" fill="none" stroke="#8c9293" stroke-width="4" stroke-linejoin="round"/>'
-    else:
-        count=3 if style=='triple' else 2
-        radius=min(height*.37,(length/count)*.39)
-        for i in range(count): body+=fan(length*(i+.5)/count,height*.5,radius)
-    text_y=height*.58 if style.startswith('mpx') else height*.22 if edge else height-6
-    text_size=min(7.0,height*.17, length/max(25,len(model['name'])*.63))
-    body+=f'<text x="{length-9}" y="{text_y}" fill="#e4e9e8" font-family="system-ui,sans-serif" font-size="{text_size}" text-anchor="end">{title}</text>'
-    dimension=f'{model["length_mm"]:g} mm' if model['length_mm'] else 'MPX envelope · not to scale'
-    label=escape(dimension)
-    note='Verified length · schematic details' if model['length_mm'] else 'Body dimensions require measurement'
-    if edge and not model['thickness_mm'] and model['length_mm']: note+=' · nominal slot thickness'
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="-16 -10 {width} {view_height}" role="img" aria-label="{title} dimensioned 2D schematic">
-<defs><linearGradient id="body" x2="0" y2="1"><stop stop-color="{color}"/><stop offset="1" stop-color="#151b1e"/></linearGradient><pattern id="fins" width="2" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="4" fill="#a99569"/><path d="M.4 0V4" stroke="#ddd0af" stroke-width=".65"/></pattern></defs>
-{body}<path d="M0 {height+7}V{height+13} M0 {height+10}H{length} M{length} {height+7}V{height+13}" stroke="#448c77" fill="none" stroke-width=".6"/><text x="{length/2}" y="{height+19}" text-anchor="middle" fill="#335d50" font-family="system-ui,sans-serif" font-size="6">{label}</text><text x="{length/2}" y="{height+26}" text-anchor="middle" fill="#708278" font-family="system-ui,sans-serif" font-size="4">{escape(note)}</text></svg>'''
+        height=known or (145 if model['category']=='Apple MPX' else 111.76)
+    return length,height
+
+def svg(model,edge=False,installed=False):
+    length,height=geometry(model,edge)
+    body=draw(model,length,height,edge)
+    title=escape(model['name'])
+    if installed:
+        return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {length} {height}" role="img" aria-label="{title} installed side">{body}</svg>'
+    label=f'{model["length_mm"]:g} mm' if model['length_mm'] else 'MPX body dimensions uncalibrated'
+    note='Individual board-family artwork · published envelope'
+    if not model['thickness_mm'] and edge:note+=' · nominal slot thickness'
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="-16 -10 {length+32} {height+45}" role="img" aria-label="{title} dimensioned view">{body}<path d="M0 {height+7}V{height+13} M0 {height+10}H{length} M{length} {height+7}V{height+13}" stroke="#448c77" fill="none" stroke-width=".6"/><text x="{length/2}" y="{height+19}" text-anchor="middle" fill="#335d50" font-family="Arial,sans-serif" font-size="6">{label}</text><text x="{length/2}" y="{height+26}" text-anchor="middle" fill="#708278" font-family="Arial,sans-serif" font-size="4">{escape(note)}</text></svg>'''
 
 (ROOT/'models').mkdir(parents=True,exist_ok=True)
 for model in MODELS:
+    assert model['id'] in FAMILIES, f"Appearance required: {model['id']}"
+    model['artwork_family']=FAMILIES[model['id']]
+    model['artwork_description']=LABELS[model['artwork_family']]
+    model['installed_asset']=f'models/{model["id"]}-installed.svg'
+    model['appearance_source']=model['source']
+    model['artwork_status']='family-specific illustration'
+    if model['id'] in RASTER_MAP:
+        asset='artwork/'+RASTER_MAP[model['id']]
+        image=Image.open(ROOT/asset)
+        box=image.getchannel('A').point(lambda alpha:255 if alpha>=128 else 0).getbbox() if 'A' in image.getbands() else (0,0,*image.size)
+        # Ignore near-transparent edge noise, and keep the A6000 mounting tab behind the rail.
+        if RASTER_MAP[model['id']]=='rtx-a6000.png': box=(box[0],box[1],box[2]-round((box[2]-box[0])*.047),box[3])
+        model['installed_asset']=asset
+        model['raster_crop']={'image_width':image.width,'image_height':image.height,'box':box}
+        model['artwork_status']='rendered family profile'
+        model['render_preview']=asset
+        model['render_preview_label']='Clean installed render ↗'
     for view in ['face','edge']:
         (ROOT/'models'/f'{model["id"]}-{view}.svg').write_text(svg(model,view=='edge'))
-(ROOT/'catalog.json').write_text(json.dumps({'version':2,'checked':'2026-11-04','visual_profiles':VISUAL_PROFILES,'models':MODELS},indent=2)+'\n')
-print(f'Generated {len(MODELS)} board profiles and {len(MODELS)*2} SVG views')
+    (ROOT/'models'/f'{model["id"]}-installed.svg').write_text(svg(model,True,True))
+lines=['# OEM card dimensions', '', 'All lengths and widths below are millimeters. A slot count is not a measured cooler width. Nominal width is used only where exact thickness is unpublished; it remains uncertain in the builder. MPX reserves an entire connector pair independently of its visual body estimate.', '', '| Board / variant | Length | Board height | Cooler thickness | Published slots | Nominal fallback width | Source |', '| --- | ---: | ---: | ---: | ---: | ---: | --- |']
+for m in MODELS:
+    val=lambda n:'Unpublished' if n is None else f'{n:g}'
+    fallback='—' if m['thickness_mm'] is not None else f'{geometry(m,True)[1]:.2f} (estimate)'
+    lines.append(f"| {m['name']} · {m['variant']} | {val(m['length_mm'])} | {val(m['height_mm'])} | {val(m['thickness_mm'])} | {val(m['slots'])} | {fallback} | [Manufacturer]({m['source']}) |")
+(ROOT/'builder/CARD-DIMENSIONS.md').write_text('\n'.join(lines)+'\n')
+(ROOT/'partner-catalog.json').write_text(json.dumps({'version':1,'scope':'Partner variants excluded from the OEM builder','models':PARTNER_MODELS},indent=2)+'\n')
+(ROOT/'catalog.json').write_text(json.dumps({'version':3,'checked':'2026-11-05','visual_profiles':VISUAL_PROFILES,'models':MODELS},indent=2)+'\n')
+print(f'Generated {len(MODELS)} board profiles across {len({m["artwork_family"] for m in MODELS})} cooler families; {len(MODELS)*3} views')

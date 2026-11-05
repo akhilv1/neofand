@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "checked": "2026-11-04",
+  "version": 3,
+  "checked": "2026-11-05",
   "visual_profiles": [
     {
       "id": "geforce-installed-thin",
@@ -40,7 +40,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-compact",
+      "artwork_description": "NVIDIA Ampere compact blower",
+      "installed_asset": "models/rtx-a2000-12-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-a4000",
@@ -56,7 +62,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-single",
+      "artwork_description": "NVIDIA Ampere single-slot blower",
+      "installed_asset": "models/rtx-a4000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-a4500",
@@ -72,7 +84,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-gold",
+      "artwork_description": "NVIDIA Ampere black / gold blower",
+      "installed_asset": "models/rtx-a4500-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-a5000",
@@ -88,7 +106,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-gold",
+      "artwork_description": "NVIDIA Ampere black / gold blower",
+      "installed_asset": "models/rtx-a5000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-a5500",
@@ -104,7 +128,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-gold",
+      "artwork_description": "NVIDIA Ampere black / gold blower",
+      "installed_asset": "models/rtx-a5500-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-a6000",
@@ -120,7 +150,25 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ampere-gold",
+      "artwork_description": "NVIDIA Ampere black / gold blower",
+      "installed_asset": "artwork/rtx-a6000.png",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          57,
+          163,
+          2058,
+          547
+        ]
+      },
+      "render_preview": "artwork/rtx-a6000.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "rtx-2000-ada",
@@ -136,7 +184,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-compact",
+      "artwork_description": "NVIDIA Ada low-profile blower",
+      "installed_asset": "models/rtx-2000-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-4000-sff-ada",
@@ -152,7 +206,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-compact",
+      "artwork_description": "NVIDIA Ada low-profile blower",
+      "installed_asset": "models/rtx-4000-sff-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-4000-ada",
@@ -168,7 +228,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-single",
+      "artwork_description": "NVIDIA Ada single-slot blower",
+      "installed_asset": "models/rtx-4000-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-4500-ada",
@@ -184,7 +250,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-gold",
+      "artwork_description": "NVIDIA Ada workstation blower",
+      "installed_asset": "models/rtx-4500-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-5000-ada",
@@ -200,7 +272,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-gold",
+      "artwork_description": "NVIDIA Ada workstation blower",
+      "installed_asset": "models/rtx-5000-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-6000-ada",
@@ -216,7 +294,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "ada-gold",
+      "artwork_description": "NVIDIA Ada workstation blower",
+      "installed_asset": "models/rtx-6000-ada-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-2000-blackwell",
@@ -232,7 +316,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-compact",
+      "artwork_description": "NVIDIA Blackwell compact blower",
+      "installed_asset": "models/rtx-pro-2000-blackwell-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-4000-sff-blackwell",
@@ -248,7 +338,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-compact",
+      "artwork_description": "NVIDIA Blackwell compact blower",
+      "installed_asset": "models/rtx-pro-4000-sff-blackwell-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-4000-blackwell",
@@ -264,7 +360,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-single",
+      "artwork_description": "NVIDIA Blackwell single-slot blower",
+      "installed_asset": "models/rtx-pro-4000-blackwell-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-4500-blackwell",
@@ -280,7 +382,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-blower",
+      "artwork_description": "NVIDIA Blackwell workstation blower",
+      "installed_asset": "models/rtx-pro-4500-blackwell-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-5000-blackwell",
@@ -296,7 +404,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-blower",
+      "artwork_description": "NVIDIA Blackwell workstation blower",
+      "installed_asset": "models/rtx-pro-5000-blackwell-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-6000-maxq",
@@ -312,7 +426,13 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-blower",
+      "artwork_description": "NVIDIA Blackwell workstation blower",
+      "installed_asset": "models/rtx-pro-6000-maxq-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-pro-6000-workstation",
@@ -328,7 +448,25 @@
       "source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
       "notes": "Slot count is published; exact cooler thickness is not stated in the source. Installed-edge thickness uses a labeled nominal slot envelope.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "blackwell-flow",
+      "artwork_description": "NVIDIA Blackwell double flow-through",
+      "installed_asset": "artwork/rtx-pro6000-workstation.png",
+      "appearance_source": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          53,
+          199,
+          2120,
+          515
+        ]
+      },
+      "render_preview": "artwork/rtx-pro6000-workstation.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "quadro-p6000",
@@ -344,7 +482,13 @@
       "source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "quadro-silver",
+      "artwork_description": "Quadro Pascal silver / green",
+      "installed_asset": "models/quadro-p6000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "quadro-rtx-5000",
@@ -360,7 +504,13 @@
       "source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "quadro-green",
+      "artwork_description": "Quadro RTX black / green",
+      "installed_asset": "models/quadro-rtx-5000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "quadro-rtx-6000",
@@ -376,7 +526,13 @@
       "source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "quadro-green",
+      "artwork_description": "Quadro RTX black / green",
+      "installed_asset": "models/quadro-rtx-6000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "quadro-rtx-8000",
@@ -392,87 +548,13 @@
       "source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "rtx-3060-ventus",
-      "name": "GeForce RTX 3060 12GB",
-      "vendor": "NVIDIA",
-      "category": "Consumer",
-      "variant": "MSI VENTUS 2X 12G OC",
-      "length_mm": 235,
-      "height_mm": 124,
-      "thickness_mm": 42,
-      "slots": 2,
-      "style": "dual",
-      "source": "https://fr.msi.com/Graphics-Card/GeForce-RTX-3060-VENTUS-2X-12G-OC/Specification",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "rtx-4060ti-ventus",
-      "name": "GeForce RTX 4060 Ti 16GB",
-      "vendor": "NVIDIA",
-      "category": "Consumer",
-      "variant": "MSI VENTUS 2X BLACK 16G OC",
-      "length_mm": 199,
-      "height_mm": 120,
-      "thickness_mm": 42,
-      "slots": 2,
-      "style": "dual",
-      "source": "https://fr.msi.com/Graphics-Card/GeForce-RTX-4060-Ti-VENTUS-2X-BLACK-16G-OC/Specification",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "rtx-5060ti-ventus",
-      "name": "GeForce RTX 5060 Ti 16GB",
-      "vendor": "NVIDIA",
-      "category": "Consumer",
-      "variant": "MSI VENTUS 2X OC PLUS",
-      "length_mm": 227,
-      "height_mm": 126,
-      "thickness_mm": 41,
-      "slots": 2,
-      "style": "dual",
-      "source": "https://www.msi.com/Graphics-Card/GeForce-RTX-5060-Ti-16G-VENTUS-2X-OC-PLUS/Specification",
-      "notes": "Current specification page says 126 mm; one regional PDF says 127 mm. Verify the shipping revision.",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "rtx-4070tis-ventus",
-      "name": "GeForce RTX 4070 Ti SUPER",
-      "vendor": "NVIDIA",
-      "category": "Consumer",
-      "variant": "MSI VENTUS 3X OC",
-      "length_mm": 308,
-      "height_mm": 120,
-      "thickness_mm": 50,
-      "slots": null,
-      "style": "triple",
-      "source": "https://my.msi.com/Graphics-Card/GeForce-RTX-4070-Ti-SUPER-16G-VENTUS-3X-OC/Specification",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "rtx-5070ti-ventus",
-      "name": "GeForce RTX 5070 Ti",
-      "vendor": "NVIDIA",
-      "category": "Consumer",
-      "variant": "MSI VENTUS 3X OC",
-      "length_mm": 303,
-      "height_mm": 121,
-      "thickness_mm": 49,
-      "slots": null,
-      "style": "triple",
-      "source": "https://www.msi.com/Graphics-Card/GeForce-RTX-5070-Ti-16G-VENTUS-3X-OC/Specification",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "quadro-green",
+      "artwork_description": "Quadro RTX black / green",
+      "installed_asset": "models/quadro-rtx-8000-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-sg/products/workstations/previous-quadro-desktop-gpus/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rtx-3080-fe",
@@ -490,9 +572,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thin",
-      "render_preview": "geforce-installed-thin-concept-v1.png",
-      "render_preview_label": "Thin installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ampere",
+      "artwork_description": "GeForce Ampere Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/30-series/rtx-3080-3080ti/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-3090-fe",
@@ -510,9 +608,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thick",
-      "render_preview": "rtx-4090-fe-installed-v2.png",
-      "render_preview_label": "Thick installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ampere",
+      "artwork_description": "GeForce Ampere Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/30-series/rtx-3090-3090ti/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-3090ti-fe",
@@ -530,9 +644,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thick",
-      "render_preview": "rtx-4090-fe-installed-v2.png",
-      "render_preview_label": "Thick installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ampere",
+      "artwork_description": "GeForce Ampere Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/30-series/rtx-3090-3090ti/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-4080s-fe",
@@ -550,9 +680,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thin",
-      "render_preview": "geforce-installed-thin-concept-v1.png",
-      "render_preview_label": "Thin installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ada",
+      "artwork_description": "GeForce Ada Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/content/geforce-gtx/GEFORCE_RTX_4080_SUPER_User_Guide_Rev1.pdf",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-4080-fe",
@@ -570,9 +716,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thin",
-      "render_preview": "geforce-installed-thin-concept-v1.png",
-      "render_preview_label": "Thin installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette. Thin is the chosen visual family; this Founders Edition is physically a three-slot, 61 mm card.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ada",
+      "artwork_description": "GeForce Ada Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4080-family/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-4090-fe",
@@ -590,9 +752,25 @@
       "checked": "2026-11-04",
       "dimensional_status": "manufacturer length verified",
       "visual_profile": "geforce-installed-thick",
-      "render_preview": "rtx-4090-fe-installed-v2.png",
-      "render_preview_label": "Thick installed profile \u2197",
-      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette."
+      "render_preview": "artwork/geforce-clean.png",
+      "render_preview_label": "Clean installed render \u2197",
+      "visual_profile_note": "Illustrative family profile; source artwork is a 4090 study. Model-specific shroud, connector and markings are not yet finalized. Fit calculations use the published board dimensions, not this raster silhouette.",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-ada",
+      "artwork_description": "GeForce Ada Founders Edition",
+      "installed_asset": "artwork/geforce-clean.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/graphics-cards/40-series/rtx-4090/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          152,
+          2126,
+          573
+        ]
+      }
     },
     {
       "id": "rtx-5080-fe",
@@ -608,7 +786,25 @@
       "source": "https://www.nvidia.com/en-us/geforce/news/gfecnt/20246/small-form-factor-sff-ready/",
       "notes": "Dimensions follow NVIDIA SFF table; other clearance guidance on product pages is inconsistent. Cable clearance is additional.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-blackwell",
+      "artwork_description": "GeForce Blackwell Founders Edition",
+      "installed_asset": "artwork/geforce-blackwell.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/news/gfecnt/20246/small-form-factor-sff-ready/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          205,
+          2120,
+          495
+        ]
+      },
+      "render_preview": "artwork/geforce-blackwell.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "rtx-5090-fe",
@@ -624,7 +820,25 @@
       "source": "https://www.nvidia.com/en-us/geforce/news/gfecnt/20246/small-form-factor-sff-ready/",
       "notes": "Dimensions follow NVIDIA SFF table; other clearance guidance on product pages is inconsistent. Cable clearance is additional.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "fe-blackwell",
+      "artwork_description": "GeForce Blackwell Founders Edition",
+      "installed_asset": "artwork/geforce-blackwell.png",
+      "appearance_source": "https://www.nvidia.com/en-us/geforce/news/gfecnt/20246/small-form-factor-sff-ready/",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          52,
+          205,
+          2120,
+          495
+        ]
+      },
+      "render_preview": "artwork/geforce-blackwell.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "tesla-p40",
@@ -640,7 +854,13 @@
       "source": "https://images.nvidia.com/content/tesla/pdf/Tesla-P40-Product-Brief.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "tesla-pascal",
+      "artwork_description": "Tesla Pascal passive",
+      "installed_asset": "models/tesla-p40-installed.svg",
+      "appearance_source": "https://images.nvidia.com/content/tesla/pdf/Tesla-P40-Product-Brief.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "tesla-p100-pcie",
@@ -656,7 +876,13 @@
       "source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v05.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "tesla-pascal",
+      "artwork_description": "Tesla Pascal passive",
+      "installed_asset": "models/tesla-p100-pcie-installed.svg",
+      "appearance_source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v05.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "tesla-v100-pcie",
@@ -672,7 +898,13 @@
       "source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v10.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "tesla-volta",
+      "artwork_description": "Tesla Volta passive",
+      "installed_asset": "models/tesla-v100-pcie-installed.svg",
+      "appearance_source": "https://images.nvidia.com/content/grid/pdf/DA-09018-001_v10.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "a100-80-pcie",
@@ -688,7 +920,13 @@
       "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/PB-10577-001_v02.pdf",
       "notes": "Length includes I/O bracket; drawing lists 267.7 mm without bracket.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "datacenter-ampere",
+      "artwork_description": "A100 passive enclosure",
+      "installed_asset": "models/a100-80-pcie-installed.svg",
+      "appearance_source": "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/PB-10577-001_v02.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "h100-pcie",
@@ -704,7 +942,13 @@
       "source": "https://www.nvidia.com/content/dam/en-zz/Solutions/gtcs22/data-center/h100/PB-11133-001_v01.pdf",
       "notes": "Length includes I/O bracket; drawing lists 267.7 mm without bracket.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "datacenter-hopper",
+      "artwork_description": "H100 passive enclosure",
+      "installed_asset": "models/h100-pcie-installed.svg",
+      "appearance_source": "https://www.nvidia.com/content/dam/en-zz/Solutions/gtcs22/data-center/h100/PB-11133-001_v01.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "l4",
@@ -720,7 +964,13 @@
       "source": "https://images.nvidia.com/aem-dam/Solutions/Data-Center/l4/nvidia-ada-gpu-architecture-whitepaper-v2.1.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "datacenter-low",
+      "artwork_description": "L4 low-profile passive",
+      "installed_asset": "models/l4-installed.svg",
+      "appearance_source": "https://images.nvidia.com/aem-dam/Solutions/Data-Center/l4/nvidia-ada-gpu-architecture-whitepaper-v2.1.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "l40s",
@@ -736,7 +986,13 @@
       "source": "https://www.nvidia.com/en-us/data-center/l40s/",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "datacenter-ada",
+      "artwork_description": "L40S passive",
+      "installed_asset": "models/l40s-installed.svg",
+      "appearance_source": "https://www.nvidia.com/en-us/data-center/l40s/",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "rx-7900xt",
@@ -752,7 +1008,25 @@
       "source": "https://www.amd.com/en/products/specifications/graphics.html",
       "notes": "Published length and slot count only; face height is illustrative.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "radeon-rdna3",
+      "artwork_description": "AMD RDNA 3 reference triple-fan",
+      "installed_asset": "artwork/radeon-rx7900.png",
+      "appearance_source": "https://www.amd.com/en/products/specifications/graphics.html",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          61,
+          207,
+          2115,
+          501
+        ]
+      },
+      "render_preview": "artwork/radeon-rx7900.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "rx-7900xtx",
@@ -768,7 +1042,25 @@
       "source": "https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xtx.html",
       "notes": "Published length and slot count only; face height is illustrative.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "radeon-rdna3",
+      "artwork_description": "AMD RDNA 3 reference triple-fan",
+      "installed_asset": "artwork/radeon-rx7900.png",
+      "appearance_source": "https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xtx.html",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          61,
+          207,
+          2115,
+          501
+        ]
+      },
+      "render_preview": "artwork/radeon-rx7900.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "radeon-pro-w6800",
@@ -784,7 +1076,13 @@
       "source": "https://www.amd.com/en/products/graphics/workstations/radeon-pro/w6800.html",
       "notes": "Full-height class is specified, not an exact millimeter height.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "radeon-pro-blue",
+      "artwork_description": "Radeon PRO blue blower",
+      "installed_asset": "models/radeon-pro-w6800-installed.svg",
+      "appearance_source": "https://www.amd.com/en/products/graphics/workstations/radeon-pro/w6800.html",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "radeon-pro-w7800",
@@ -800,7 +1098,25 @@
       "source": "https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7800.html",
       "notes": "Full-height class is specified, not an exact millimeter height.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "radeon-pro-black",
+      "artwork_description": "Radeon PRO W7000 dark blower",
+      "installed_asset": "artwork/radeon-pro-w7800.png",
+      "appearance_source": "https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7800.html",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          41,
+          173,
+          2136,
+          536
+        ]
+      },
+      "render_preview": "artwork/radeon-pro-w7800.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "radeon-pro-w7900-dual",
@@ -816,23 +1132,13 @@
       "source": "https://www.amd.com/content/dam/amd/en/documents/partner-hub/radeon-pro/amd-radeon-pro-w7900-dual-slot-datasheet-competitive.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "radeon-ai-pro-r9700",
-      "name": "Radeon AI PRO R9700",
-      "vendor": "AMD",
-      "category": "Workstation",
-      "variant": "PowerColor AI PRO R9700 32G-B",
-      "length_mm": 266.7,
-      "height_mm": 111.2,
-      "thickness_mm": 40,
-      "slots": 2,
-      "style": "blower",
-      "source": "https://www.powercolor.com/product-detail258.htm",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "radeon-pro-black",
+      "artwork_description": "Radeon PRO W7000 dark blower",
+      "installed_asset": "models/radeon-pro-w7900-dual-installed.svg",
+      "appearance_source": "https://www.amd.com/content/dam/amd/en/documents/partner-hub/radeon-pro/amd-radeon-pro-w7900-dual-slot-datasheet-competitive.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "instinct-mi210",
@@ -848,7 +1154,13 @@
       "source": "https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/product-briefs/instinct-mi210-brochure.pdf",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "instinct",
+      "artwork_description": "AMD Instinct passive",
+      "installed_asset": "models/instinct-mi210-installed.svg",
+      "appearance_source": "https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/product-briefs/instinct-mi210-brochure.pdf",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "arc-a770-le",
@@ -864,7 +1176,25 @@
       "source": "https://www.intel.com/content/www/us/en/support/articles/000092554.html",
       "notes": "Envelope includes I/O bracket and PCIe connector; body-only length 268.6 mm and shroud thickness 40.81 mm.",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "arc-alchemist",
+      "artwork_description": "Intel Arc A770 Limited Edition",
+      "installed_asset": "artwork/arc-a770.png",
+      "appearance_source": "https://www.intel.com/content/www/us/en/support/articles/000092554.html",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          60,
+          254,
+          2120,
+          476
+        ]
+      },
+      "render_preview": "artwork/arc-a770.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "arc-b580-le",
@@ -880,39 +1210,25 @@
       "source": "https://www.intel.com/content/www/us/en/support/articles/000091128/processors.html",
       "notes": "",
       "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "arc-pro-b60-blower",
-      "name": "Arc Pro B60 24GB",
-      "vendor": "Intel",
-      "category": "Workstation",
-      "variant": "SPARKLE Blower",
-      "length_mm": 289,
-      "height_mm": 120,
-      "thickness_mm": 42,
-      "slots": 2,
-      "style": "blower",
-      "source": "https://www.sparkle.com.tw/files/20250618145718157.pdf",
-      "notes": "",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
-    },
-    {
-      "id": "arc-pro-b60-passive",
-      "name": "Arc Pro B60 24GB",
-      "vendor": "Intel",
-      "category": "Server PCIe",
-      "variant": "ASRock Passive",
-      "length_mm": 190,
-      "height_mm": 112,
-      "thickness_mm": 19,
-      "slots": 1,
-      "style": "passive",
-      "source": "https://www.asrock.com/Graphics-Card/Intel/Intel%20Arc%20Pro%20B60%20Passive%2024GB/index.asp",
-      "notes": "Manufacturer recommends 30 mm additional cable clearance.",
-      "checked": "2026-11-04",
-      "dimensional_status": "manufacturer length verified"
+      "dimensional_status": "manufacturer length verified",
+      "board_origin": "OEM / reference",
+      "artwork_family": "arc-battlemage",
+      "artwork_description": "Intel Arc B580 Limited Edition",
+      "installed_asset": "artwork/arc-b580.png",
+      "appearance_source": "https://www.intel.com/content/www/us/en/support/articles/000091128/processors.html",
+      "artwork_status": "rendered family profile",
+      "raster_crop": {
+        "image_width": 2172,
+        "image_height": 724,
+        "box": [
+          43,
+          184,
+          2076,
+          529
+        ]
+      },
+      "render_preview": "artwork/arc-b580.png",
+      "render_preview_label": "Clean installed render \u2197"
     },
     {
       "id": "mpx-580x",
@@ -929,7 +1245,13 @@
       "notes": "Apple publishes the module class, not mechanical body dimensions in the cited specification. Template is illustrative and requires measurement before dimensional placement. MPX is not a standard PCIe card.",
       "checked": "2026-11-04",
       "dimensional_status": "body dimensions not published",
-      "module_class": "half"
+      "module_class": "half",
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-half",
+      "artwork_description": "Apple half-height MPX",
+      "installed_asset": "models/mpx-580x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w5500x",
@@ -946,7 +1268,13 @@
       "notes": "Apple publishes the module class, not mechanical body dimensions in the cited specification. Template is illustrative and requires measurement before dimensional placement. MPX is not a standard PCIe card.",
       "checked": "2026-11-04",
       "dimensional_status": "body dimensions not published",
-      "module_class": "half"
+      "module_class": "half",
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-half",
+      "artwork_description": "Apple half-height MPX",
+      "installed_asset": "models/mpx-w5500x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w6600x",
@@ -963,7 +1291,13 @@
       "notes": "Apple publishes the module class, not mechanical body dimensions in the cited specification. Template is illustrative and requires measurement before dimensional placement. MPX is not a standard PCIe card.",
       "checked": "2026-11-04",
       "dimensional_status": "body dimensions not published",
-      "module_class": "half"
+      "module_class": "half",
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-half",
+      "artwork_description": "Apple half-height MPX",
+      "installed_asset": "models/mpx-w6600x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w5700x",
@@ -988,7 +1322,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-w5700x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-vega-ii",
@@ -1013,7 +1353,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-vega-ii-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-vega-ii-duo",
@@ -1038,7 +1384,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-vega-ii-duo-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w6800x",
@@ -1063,7 +1415,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-w6800x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w6800x-duo",
@@ -1088,7 +1446,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-w6800x-duo-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     },
     {
       "id": "mpx-w6900x",
@@ -1113,7 +1477,13 @@
         "visual_slot_span": 3,
         "slot_span_basis": "user-provided chassis reference",
         "exclude_afterburner": true
-      }
+      },
+      "board_origin": "OEM / reference",
+      "artwork_family": "mpx-full",
+      "artwork_description": "Apple full-height MPX",
+      "installed_asset": "models/mpx-w6900x-installed.svg",
+      "appearance_source": "https://support.apple.com/en-us/111907",
+      "artwork_status": "family-specific illustration"
     }
   ]
 }

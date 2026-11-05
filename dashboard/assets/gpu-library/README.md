@@ -1,23 +1,29 @@
-# Dimensioned 2D GPU library
+# OEM GPU library and Mac Pro system builder
 
-This is a curated set of common local-AI board families, professional GPUs, used PCIe accelerators, and all nine Apple MPX graphics module variants in Apple's Mac Pro specification. It is not a popularity ranking or a promise of host/driver compatibility.
+The library contains 55 OEM/reference board profiles: NVIDIA reference/Founders Edition, AMD reference cards, Intel Limited Edition, and Apple MPX. Eight previously cataloged partner variants are archived in `partner-catalog.json` and excluded from the main picker.
 
-`catalog.json` records the exact board variant, primary manufacturer source, verified dimensions, and missing data. `models/` contains two reusable SVG projections per profile. Run `python3 build.py` to regenerate the manifest and SVG files. The webpage filters and previews them, shows occupancy relative to a configurable bay length, and links each source.
+The system builder places combinations in the user's Mac Pro chassis image. It offers numbered connector placement, manual measured dimensions, bay-length and bracket-pitch calibration, extra gap, collision/length feedback, local persistence, and JSON export/import. The current preview reserves the pictured Apple I/O card and omits Afterburner. It does not change the server or hardware.
 
-Known millimeter dimensions control the SVG envelope. Inch values use 25.4 mm/inch. Styling is schematic; it does not claim a mechanically exact fan or shroud design. The installed-edge view uses actual cooler thickness when published. Otherwise its thickness is an illustrative nominal envelope of 20.32 mm per reported slot, labeled on the artwork. A slot count is not a measured cooler thickness. Missing face height is also illustrative.
+## Dimensions and fit
 
-MPX modules have a proprietary mechanical and electrical envelope. Apple documents half/full-height classifications but does not give millimeter body dimensions in the cited specification. Their templates therefore remain explicitly not to scale and cannot report a bay-fit ratio until measured or backed by a mechanical drawing. Their placeholder drawing envelope is not a specification.
+`catalog.json` preserves exact board variants and primary specification sources. Published length, height, cooler thickness and slot count remain independent values. Missing thickness uses a clearly marked nominal slot envelope; missing MPX body dimensions stay uncalibrated. Amber envelopes require measurements. No overall-fit guarantee is derived from a length-only comparison.
 
-Manufacturer pages sometimes disagree. The RTX 5060 Ti VENTUS 2X page says 126 mm high, while one regional PDF says 127 mm. NVIDIA's SFF table lists 40 mm thickness for the 5080/5090 FE, while some product-page clearance text describes larger clearance. These conflicts are noted by model; verify the shipping revision and allow separate cable, airflow, and mounting clearance.
+[Slot mechanics](builder/SLOT-MECHANICS.md) documents all connector offsets, the distinction between Apple numbered connectors and GPU slot width, the 20.32 mm nominal pitch, double-wide 40.64 mm spacing, MPX pair reservations, rounding tolerance and limits. [Card dimensions](builder/CARD-DIMENSIONS.md) lists every OEM board's width and source.
 
-The A6000 3D preview is a generated perspective illustration of the user's approved system layout, not a dimensionally verified mesh. The active sensor dashboard retains its approved flat view for callout alignment.
+The collision engine is a pure module, `builder/fit.mjs`. A 3-slot card at connector 1 blocks connector 2; automatic placement skips that connector. MPX uses pairs 1–2 or 3–4 and is limited to two modules. Known body and published bracket widths are respected. A measured override can resolve unpublished dimensions.
 
-Full-height MPX entries also carry `installation_layout` metadata for up to two modules in the Mac Pro 7,1. The three-slot visual span comes from the user's chassis reference and is deliberately separate from manufacturer `slots` and millimeter dimensions. The clean dual-MPX reference omits Afterburner and the overlaid add-in plate. It is illustrative, not a mechanical drawing. Half-height entries do not inherit the full-height visual span.
+## Appearance
 
-Rendered samples are `rtx-4090-fe-installed-v2.png` and `macpro-dual-mpx-v1.png`, generated with the built-in ImageGen tool. The former is an installed-edge illustration matching the approved A6000 camera; the latter follows the user-provided chassis photo. See `render-prompts.md` and `rtx-4090-installed-prompts.md` for the exact prompts. The initial broad fan-face sample was rejected and is archived locally as an earlier draft. Neither is a verified CAD model. The live A6000 dashboard artwork is unchanged.
+`appearance.py` assigns every OEM model to an explicit board/cooler family. There is no fallback to an NVIDIA professional shroud. The 29 families distinguish GeForce Founders frames, Radeon reference triple fans, blue and dark Radeon PRO blowers, Intel A770/B580, legacy Quadro, passive accelerators, and MPX modules. Boards sharing an actual cooler can share geometry; colors, proportions and markings follow their class.
 
-## Approved installed-side visual families
+Popular OEM families use clean raster renders in `artwork/`; the remaining entries use family-specific illustrated geometry. The broad face and installed edge are separate views, with installed edge as the default. All models also have a body-only installed SVG for composition and two dimensioned projections. Rendered views are illustrations, not CAD meshes or mechanically verified shroud replicas.
 
-The user selected the thinner installed-side render as the 3080/4080 visual family and the thicker render as the 3090/4090 visual family. `catalog.json` records these under `visual_profiles`, separately from manufacturer dimensions. The 3080 and 4080 Founders Edition records have been added explicitly. This brings the catalog to 63 profiles and 126 SVG views.
+The chassis compositor scales each card from its own dimensions. It crops the display bounds of the original alpha image, masks card ends behind the retention rail, and removes power connectors from clean renders. Actual cable clearance is still required. The exact built-in ImageGen prompts are in [artwork/PROMPTS.md](artwork/PROMPTS.md); manufacturer appearance sources remain linked in the catalog. The earlier perspective A6000 system preview remains available.
 
-The thin source is `geforce-installed-thin-concept-v1.png`; the thick source is `rtx-4090-fe-installed-v2.png`. Both originate from the 4090 view study and are shape references, with model-specific markings and connectors still to be finalized. They retain the common approved camera orientation. Fit math and dimensioned SVGs use model specifications: the 3080 FE is 285 × 112 mm and two slots; the 4080 FE remains 304 × 137 × 61 mm and three slots despite the user's thin visual-family choice. The new mapping does not change measured slot spacing or claim a slim 4080 FE exists.
+## Source and checks
+
+Run `python3 build.py` (Python 3.9+ with Pillow) to regenerate metadata, the card-dimension document, and SVGs. PNGs are preserved source assets. Pillow is used only to inspect alpha bounds for browser placement; the generated PNGs are not edited by Python.
+
+Run `node --test builder/fit.test.mjs` for meaningful collision cases: mixed widths, double/single-wide connector spacing, 3-slot overlap, I/O reservation, bay over-length, MPX pairs, measured overrides and extra gap. UI verification should cover mixed OEM layouts, visible red collisions, restored clearances, the two-MPX limit, export/import, persistence and narrow screens.
+
+The builder saves layouts in the current browser under `neofand-gpu-layout-v1`. JSON imports accept catalog model IDs, slots 1–7, and bounded numeric controls and measured overrides; files are limited to 100 KB / 24 cards. Layouts are not uploaded to the server.
