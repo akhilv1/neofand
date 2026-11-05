@@ -62,7 +62,7 @@ html=html.replace('<div class="grp">Monitoring</div>','<div class="grp">Monitori
 html=html.replace('<div id="tab-storage" hidden>','<div id="tab-proxmox" class="grid" hidden><section class="card wide"><h2>Proxmox</h2><div class="body"><p id="proxmox-status">Loading host inventory…</p><p class="sub">Read-only node, VM/container status and recent tasks. Guest controls are managed in Proxmox.</p><div class="tw" id="proxmox-resources"></div></div></section></div><div id="tab-storage" hidden>')
 html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors"];','const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "proxmox"];')
 html=html.replace('else if (state.tab === "errors") await loadEvents();','else if (state.tab === "proxmox") await window.neofandProxmoxRefresh();\n    else if (state.tab === "errors") await loadEvents();')
-html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => Boolean(window.neofandHostInfo?.proxmox_available),")
+html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => !window.neofandHostInfo || Boolean(window.neofandHostInfo.proxmox_available),")
 html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();')
 html=html.replace('</head>','<script src="/hardware/assets/proxmox.js" defer></script></head>')
 output.write_text(html)

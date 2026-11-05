@@ -4,10 +4,19 @@ import time
 import unittest
 from unittest.mock import patch,MagicMock
 from pathlib import Path
-from linux_telemetry import cpu_percent,gpu_rows
+from linux_telemetry import cpu_percent,gpu_rows,amd_rows
 from linux_api import series,Handler
 
 class TelemetryTests(unittest.TestCase):
+ def test_amd_sysfs_units_and_no_invented_power(self):
+  with tempfile.TemporaryDirectory() as temp:
+   device=Path(temp)/'card0/device';sensor=device/'hwmon/hwmon1';sensor.mkdir(parents=True)
+   for name,value in [('vendor','0x1002'),('gpu_busy_percent','12'),('mem_info_vram_used','1024'),('mem_info_vram_total','2048')]: (device/name).write_text(value)
+   (sensor/'temp1_input').write_text('56000')
+   gpu,metrics=amd_rows(Path(temp),2)[0];values={m[1]:m[3] for m in metrics}
+   self.assertEqual(gpu['index'],2);self.assertEqual(values['gpu2_temp_c'],56)
+   self.assertEqual(values['gpu2_mem_total_bytes'],2048);self.assertEqual(values['gpu2_util_gpu_pct'],12)
+   self.assertNotIn('gpu2_power_w',values)
  def test_cpu_delta_excludes_idle(self):
   self.assertEqual(cpu_percent((1000,600),(1200,650)),75)
   self.assertIsNone(cpu_percent((1000,600),(1000,600)))

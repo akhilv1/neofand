@@ -57,6 +57,28 @@ def gpu_rows(output):
     return result
 
 
+def amd_rows(root=Path('/sys/class/drm'),start_index=0):
+    result=[];seen=set()
+    for card in sorted(root.glob('card*')):
+        if not re.fullmatch(r'card[0-9]+',card.name):continue
+        device=card/'device';identity=str(device.resolve())
+        if identity in seen or read(device/'vendor')!='0x1002':continue
+        seen.add(identity);index=start_index+len(result);metrics=[]
+        for filename,name,unit,scale in [
+            ('gpu_busy_percent','util_gpu_pct','%',1),
+            ('mem_info_vram_used','mem_used_bytes','B',1),
+            ('mem_info_vram_total','mem_total_bytes','B',1)]:
+            try:value=float((device/filename).read_text())*scale
+            except (OSError,ValueError):continue
+            if math.isfinite(value):metrics.append(('gpu',f'gpu{index}_{name}',unit,value))
+        for sensor in sorted((device/'hwmon').glob('hwmon*/temp1_input')):
+            try:value=float(sensor.read_text())/1000
+            except (OSError,ValueError):continue
+            if math.isfinite(value):metrics.append(('gpu',f'gpu{index}_temp_c','C',value));break
+        if metrics:result.append((dict(index=index,name='AMD Radeon (amdgpu)',pci_bus=device.resolve().name,physical_slot=None),metrics))
+    return result
+
+
 def atomic_json(path, data):
     tmp=path.with_suffix('.tmp')
     tmp.write_text(json.dumps(data,allow_nan=False))
@@ -90,6 +112,10 @@ def collect(previous):
             gpus.append(gpu)
             for row in rows: add(*row)
     except (OSError,ValueError,subprocess.SubprocessError): warnings.append('NVIDIA telemetry unavailable for this sample.')
+    for gpu,rows in amd_rows(start_index=max((g['index'] for g in gpus),default=-1)+1):
+        gpus.append(gpu)
+        for row in rows:add(*row)
+    if gpus and all(g['name'].startswith('AMD') for g in gpus):warnings=[]
     dmi='/sys/class/dmi/id/'
     family=read(dmi+'product_family'); version=read(dmi+'product_version')
     display=next((v for v in (family,version,read(dmi+'product_name')) if v and v.lower() not in ('default string','to be filled by o.e.m.','system product name','system version')),'Linux host')

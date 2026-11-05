@@ -25,7 +25,7 @@ pct create 120 local:vztmpl/IMAGE.tar.zst --hostname hardware \
   --ssh-public-keys /root/.ssh/authorized_keys
 ```
 
-The Linux sampler publishes CPU, host RAM/PSI, readable hwmon temperatures and NVIDIA metrics when host nvidia-smi is available. It retains 30 days of chart history, samples live every 2 seconds and persists history every 30 seconds. Host journal and storage snapshots are refreshed separately. Missing PSU/fan/GPU readings remain unavailable. No AMD/Intel GPU utilization backend is included yet. On Proxmox, a separate root-local collector uses only `pvesh get` to publish node resource usage, VM/LXC status and recent task results every 60 seconds. No API token is needed and no guest controls are exposed; task usernames, raw logs and guest configurations are excluded. P620 artwork is enabled only when the host identifies as P620; placement and GPU board variant remain illustrative.
+The Linux sampler publishes CPU, host RAM/PSI, readable hwmon temperatures and NVIDIA metrics when host nvidia-smi is available. It retains 30 days of chart history, samples live every 2 seconds and persists history every 30 seconds. Host journal and storage snapshots are refreshed separately. Missing PSU/fan/GPU readings remain unavailable. AMD amdgpu sysfs supplies GPU busy percent, VRAM bytes and temperature when exposed. Intel GPU utilization is not included. Integrated-GPU package power is not mislabeled as board power. On Proxmox, a separate root-local collector uses only `pvesh get` to publish node resource usage, VM/LXC status and recent task results every 60 seconds. No API token is needed and no guest controls are exposed; task usernames, raw logs and guest configurations are excluded. P620 artwork is enabled only when the host identifies as P620; placement and GPU board variant remain illustrative.
 
 An LXC's `/proc` and cgroup readings describe its limits, not necessarily the physical host. Therefore the image deliberately does **not** run the collector itself. With no host bind mount, it shows unavailable telemetry instead of fabricated server readings. Only generated telemetry is shared, never the host root, `/proc`, `/sys`, journals or GPU devices. The snapshot directory is readable by the container's mapped user; SQLite/WAL files are created with umask 0022. Only sanitized event snapshots reach the API.
 
@@ -35,7 +35,7 @@ An LXC's `/proc` and cgroup readings describe its limits, not necessarily the ph
 - On the host: `systemctl status neofand-host neofand-host-events.timer neofand-host-storage.timer`.
 - Keep `/var/lib/neofand-host` backed up separately: Proxmox bind-mount data is not included in normal container backups.
 - No power-outage proof without UPS events. Restart gaps are explicitly inferred.
-- This template has been package/configuration/API tested in an isolated image build. A real Proxmox `pct` boot has not been verified yet; it needs a target node.
+- Build checks cover packages, native services, API behavior and rootfs identity cleanup. Deployment checks must verify `pct` boot, networking and service health on the target node; the download manifest records the verified deployment.
 
 ## Build
 

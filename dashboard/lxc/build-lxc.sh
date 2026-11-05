@@ -34,10 +34,10 @@ cp -a "$repo/dashboard/assets/." "$work/www/assets/"
 rm -rf "$work/www/assets/downloads"
 cp "$repo/dashboard/linux/"{p620.js,p620.css,proxmox.js} "$work/www/assets/"
 python3 "$repo/dashboard/linux/build_p620.py" "$repo/dashboard/index.html" "$work/www/index.html"
-python3 - "$work/www/assets/build-info.json" "$commit" "${PR_NUMBER:-}" <<'PY'
+python3 - "$work/www/assets/build-info.json" "$commit" "${PR_NUMBER:-}" "${SOURCE_BRANCH:-source-archive}" <<'PY'
 import json,sys,datetime
 from pathlib import Path
-Path(sys.argv[1]).write_text(json.dumps(dict(commit=sys.argv[2],branch='codex/sensor-callouts',pr_number=int(sys.argv[3]) if sys.argv[3] else None,built_at=datetime.datetime.now(datetime.timezone.utc).isoformat())))
+Path(sys.argv[1]).write_text(json.dumps(dict(commit=sys.argv[2],branch=sys.argv[4],pr_number=int(sys.argv[3]) if sys.argv[3] else None,built_at=datetime.datetime.now(datetime.timezone.utc).isoformat())))
 PY
 docker pull caddy:2-alpine
 caddy_image=$(docker image inspect caddy:2-alpine --format '{{index .RepoDigests 0}}')
