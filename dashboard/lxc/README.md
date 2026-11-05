@@ -42,3 +42,7 @@ An LXC's `/proc` and cgroup readings describe its limits, not necessarily the ph
 Run `build-lxc.sh REPOSITORY_ROOT OUTPUT_DIRECTORY` on an amd64 Linux builder with Docker, Python 3, curl, zstd and gpgv. It verifies Proxmox's catalog signature and the Ubuntu template SHA512, builds the native service image, exports a rootfs archive, and writes SHA256, build metadata and the host collector package. Docker is only a build tool. No running container or host telemetry is exported. Package versions and source commit are recorded in the image.
 
 References: [Proxmox container documentation](https://github.com/proxmox/pve-docs/blob/master/pct.adoc), including system templates, unprivileged containers and read-only bind mounts.
+
+### ZFS and drive health
+
+On Proxmox, the root inventory collector reads ZFS member devices from the host storage snapshot and runs read-only `smartctl -a -j` queries once per minute. Install `smartmontools` on the Proxmox host to enable SMART summaries. Missing or failed readings are shown as unavailable. No self-tests or device settings are changed. The container receives only summarized health fields, without drive serial numbers.

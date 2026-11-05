@@ -35,9 +35,34 @@
   if(!d.guest_storage?.length)panel.append(element('p','No guest volume capacity readings available.','storage-note'));
  }
 
+ function mirrorHealth(card,d,pool){
+  if(pool!=='rpool')return;
+  card.classList.add('pve-boot-card');
+  const panel=element('div',undefined,'pve-mirror-health'),health=(d.pool_health||[]).find(p=>p.name===pool);
+  if(!health){panel.append(element('p','Mirror health readings unavailable.','storage-note'));card.insertBefore(panel,card.querySelector(':scope > details'));return;}
+  const stale=d.status!=='ok'||Date.now()/1000-d.timestamp>180||Date.now()/1000-health.timestamp>180;
+  const groups=[];const walk=nodes=>{for(const n of nodes||[]){if(n.name.startsWith('mirror-'))groups.push(`${n.name} · ${n.state||'Unknown'}`);walk(n.children)}};walk(health.topology);
+  panel.append(element('p',`${groups.length?'ZFS mirror · '+groups.join(' / '):'ZFS topology'} · ${(health.members||[]).length} member disks${stale?' · Stale readings':''}`,'pve-mirror-title'));
+  const disks=element('div',undefined,'pve-mirror-disks');
+  for(const member of health.members||[]){const smart=member.smart||{},row=element('section',undefined,'pve-mirror-disk');
+   row.append(element('h4',smart.model||member.device));
+   row.append(element('p',`${member.device} · ZFS ${member.state||'Unknown'}`,'storage-note'));
+   const fmt=(n,suffix='')=>Number.isFinite(n)?n.toLocaleString()+suffix:'—';
+   const status={passed:'Passed',warning:'Warning',failed:'Failed',unavailable:'Unavailable'}[smart.state]||'Unavailable';
+   row.append(element('p',`SMART ${status} · ${fmt(smart.temperature_c,' °C')} · ${fmt(smart.endurance_used_pct,'%')} endurance used`,smart.state==='passed'&&!stale?'pve-smart-line':'pve-smart-line storage-warning'));
+   row.append(element('p',`Media errors ${fmt(smart.media_errors)} · Spare ${fmt(smart.available_spare_pct,'%')} · ${fmt(smart.power_on_hours,' h')} powered on`,'storage-note'));
+   if(smart.critical_warning)row.append(element('p',`NVMe critical warning: ${smart.critical_warning}`,'storage-warning'));
+   disks.append(row);
+  }
+  panel.append(disks);
+  if(health.scan)panel.append(element('p',health.scan,'storage-note'));
+  panel.append(element('p',`SMART sampled ${new Date(d.timestamp*1000).toLocaleTimeString()} · refreshes every minute`,'storage-note'));
+  card.insertBefore(panel,card.querySelector(':scope > details'));
+ }
+
  function decorateStorage(d){const tab=document.getElementById('tab-storage');if(!tab||!d)return;
   guestVolumes(d);summaryScope();tab.classList.add('pve-storage');const cards=[...tab.querySelectorAll('#storage-drives > .storage-drive')];
-  for(const card of cards){const wasOpen=Boolean(card.querySelector(':scope > .pve-detail-toggle[open]'));for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge').forEach(n=>n.remove());
+  for(const card of cards){const wasOpen=Boolean(card.querySelector(':scope > .pve-detail-toggle[open]'));for(const old of card.querySelectorAll(':scope > .pve-detail-toggle')){old.replaceWith(...[...old.children].filter(n=>n.tagName!=='SUMMARY'))}card.querySelectorAll('.pve-storage-uses,.pve-host-badge,.pve-mirror-health').forEach(n=>n.remove());
    const title=card.querySelector(':scope > .storage-drive-heading, :scope > .storage-title-line');if(!title)continue;const ownerContainer=title.classList.contains('storage-drive-heading')?title.firstElementChild:title;
    const meta=title.querySelector('.storage-note')?.textContent||'';
    const device=meta.match(/\/dev\/[a-z0-9]+/)?.[0];
@@ -49,6 +74,7 @@
    if(device&&!uses.length&&!pool){const shared=card.querySelector('.storage-membership')?.textContent;const hint=element('span',shared==='rpool'?'PVE Boot Disk':shared?'Shared · '+shared:'Host / unassigned','pve-host-badge');ownerContainer.append(hint)}
    const children=[...card.children].filter(n=>n!==title);
    if(children.length){const detail=element('details',undefined,'pve-detail-toggle');detail.dataset.storageKey=card.id||device||pool||'';detail.open=wasOpen;detail.append(element('summary','Partitions, datasets & usage'),...children);card.append(detail)}
+   mirrorHealth(card,d,pool);
   }
   const note=tab.querySelector('.storage-intro > .storage-note:last-child');if(note)note.textContent='VM ownership badges are shown only for whole physical disks configured for passthrough. PVE Boot Disk is the host boot pool. Raw installed capacity includes mirror copies; host totals cover filesystems PVE can read. Guest readings appear separately below and are not added to host totals.';
  }

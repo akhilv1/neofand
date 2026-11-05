@@ -86,6 +86,39 @@ def guest_capacity(guests,uses):
     return result
 
 
+def normalize_smart(raw,exit_code=0):
+    nvme=raw.get('nvme_smart_health_information_log',{})
+    passed=raw.get('smart_status',{}).get('passed')
+    available=isinstance(passed,bool) and not (exit_code & 7)
+    state='unavailable' if not available else 'failed' if not passed or nvme.get('critical_warning',0) else 'passed'
+    if state=='passed' and (nvme.get('media_errors',0)>0 or nvme.get('percentage_used',0)>=100):state='warning'
+    return dict(state=state,model=raw.get('model_name'),temperature_c=raw.get('temperature',{}).get('current'),
+                endurance_used_pct=nvme.get('percentage_used'),available_spare_pct=nvme.get('available_spare'),
+                media_errors=nvme.get('media_errors'),critical_warning=nvme.get('critical_warning'),
+                power_on_hours=raw.get('power_on_time',{}).get('hours'))
+
+
+def pool_health(storage_path):
+    try:storage=json.loads(Path(storage_path).read_text())
+    except (OSError,ValueError):return []
+    result=[];cache={}
+    for pool in storage.get('pools',[]):
+        members=[]
+        for member in pool.get('members',[]):
+            for device in member.get('backing_drives',[]):
+                # Only read known whole block devices; never accept command options or arbitrary paths.
+                if not re.fullmatch(r'/dev/(?:nvme\d+n\d+|sd[a-z]+|hd[a-z]+)',device):continue
+                if device not in cache:
+                    try:
+                        r=subprocess.run(['smartctl','-a','-j',device],capture_output=True,text=True,timeout=5)
+                        cache[device]=normalize_smart(json.loads(r.stdout),r.returncode)
+                    except (OSError,ValueError,subprocess.SubprocessError):cache[device]={'state':'unavailable'}
+                members.append(dict(device=device,partition=member.get('path'),state=member.get('state'),smart=cache[device]))
+        result.append(dict(name=pool.get('name'),health=pool.get('health'),topology=pool.get('topology',[]),
+                           scan=pool.get('scan'),timestamp=storage.get('timestamp'),members=members))
+    return result
+
+
 def normalize(node,status,resources,tasks):
     guests=[]
     for item in resources:
@@ -108,6 +141,7 @@ def main(path):
         data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources'),query('/nodes/'+node+'/tasks','--limit','50'))
         data['storage_uses']=guest_storage(data['guests'])
         data['guest_storage']=guest_capacity(data['guests'],data['storage_uses'])
+        data['pool_health']=pool_health(target.parent/'storage.json')
     except (OSError,ValueError,KeyError,subprocess.SubprocessError):
         try:data=json.loads(target.read_text())
         except (OSError,ValueError):data={'timestamp':0,'guests':[],'tasks':[],'node':node}
