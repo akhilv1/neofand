@@ -54,6 +54,38 @@ def guest_storage(guests):
     return uses
 
 
+def normalize_filesystems(items):
+    """Use guest filesystem totals once, regardless of backing disk count."""
+    if not isinstance(items,list):return []
+    result=[];seen=set()
+    for fs in items:
+        mount=fs.get('mountpoint','');total=fs.get('total-bytes');used=fs.get('used-bytes')
+        if not fs.get('disk') or not mount or re.match(r'^/(tmp|run|dev|proc|sys|boot)(/|$)',mount):continue
+        if not isinstance(total,int) or not isinstance(used,int) or not 0<=used<=total or total<=0:continue
+        identity=fs.get('name') or mount
+        if identity in seen:continue
+        seen.add(identity)
+        result.append(dict(mountpoint=mount,filesystem=fs.get('type'),total_bytes=total,used_bytes=used))
+    # DSM reports its mirrored OS partition too; show its actual data volumes.
+    data=[fs for fs in result if re.fullmatch(r'/volume\d+',fs['mountpoint'])]
+    return data or result
+
+
+def guest_capacity(guests,uses):
+    owners={u['vmid'] for u in uses if u.get('whole_disk')}
+    result=[]
+    for guest in guests:
+        if guest['vmid'] not in owners or guest.get('status')!='running':continue
+        entry=dict(vmid=guest['vmid'],name=guest.get('name'),status='unavailable',filesystems=[])
+        try:
+            r=subprocess.run(['qm','guest','cmd',str(guest['vmid']),'get-fsinfo'],capture_output=True,text=True,check=True,timeout=5)
+            entry['filesystems']=normalize_filesystems(json.loads(r.stdout))
+            entry['status']='ok' if entry['filesystems'] else 'unavailable'
+        except (OSError,ValueError,TypeError,subprocess.SubprocessError):pass
+        result.append(entry)
+    return result
+
+
 def normalize(node,status,resources,tasks):
     guests=[]
     for item in resources:
@@ -75,6 +107,7 @@ def main(path):
     try:
         data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources'),query('/nodes/'+node+'/tasks','--limit','50'))
         data['storage_uses']=guest_storage(data['guests'])
+        data['guest_storage']=guest_capacity(data['guests'],data['storage_uses'])
     except (OSError,ValueError,KeyError,subprocess.SubprocessError):
         try:data=json.loads(target.read_text())
         except (OSError,ValueError):data={'timestamp':0,'guests':[],'tasks':[],'node':node}

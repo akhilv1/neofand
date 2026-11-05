@@ -94,6 +94,7 @@
       for(const [label,value] of [['Physical drives',String(data.drives.length)],['Raw capacity',bytes(totals.raw)],['Accounted used',bytes(totals.used)],['Available (shared space counted once)',bytes(totals.available)]]){
         const item=make('div'); item.append(make('span','storage-note',label),make('strong','',value));summary.append(item);
       }
+      window.neofandStorageSummary?.();
       window.neofandRuntime?.sample([{ts:data.timestamp}]);
       if(stale)window.neofandRuntime?.error();
     } catch(error) {
