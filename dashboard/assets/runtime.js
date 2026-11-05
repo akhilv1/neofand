@@ -14,7 +14,7 @@
   const canLive = () => state.tab === 'overview' || state.tab === 'sensors';
   const isLive = () => auto.checked && live.checked && canLive();
   function paintStatus() {
-    const delayed = lastSample && Date.now() / 1000 - lastSample > 30;
+    const delayed = lastSample && Date.now() / 1000 - lastSample > (state.tab === 'storage' ? 60 : 30);
     const mode = !auto.checked ? 'Paused' : !connected ? lastSample ? 'Disconnected' : 'Connecting' : delayed ? 'Delayed' : isLive() ? 'Live' : 'Auto';
     status.textContent = mode;
     status.dataset.live = String(mode === 'Live');

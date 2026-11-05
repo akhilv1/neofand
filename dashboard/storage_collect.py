@@ -1,6 +1,7 @@
 """Read-only physical drive inventory and mounted filesystem usage; run on host."""
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -12,9 +13,15 @@ def collect():
                              'NAME,TYPE,SIZE,MODEL,FSTYPE,MOUNTPOINTS,MAJ:MIN,ROTA,TRAN'],
                             check=True, capture_output=True, text=True, timeout=10)
     devices = json.loads(result.stdout)['blockdevices']
+    # systemd hardening creates private bind mounts; use PID 1's host mount table.
+    host_mounts = {}
+    for line in Path('/proc/1/mountinfo').read_text().splitlines():
+        fields = line.split()
+        mount = re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), fields[4])
+        host_mounts.setdefault(fields[2], []).append(mount)
 
     def describe(node):
-        mounts = [m for m in node.get('mountpoints', []) if m and m.startswith('/')]
+        mounts = list(dict.fromkeys(host_mounts.get(node.get('maj:min'), [])))
         item = {key: node.get(key) for key in ('name', 'type', 'size', 'model', 'fstype', 'rota', 'tran')}
         item.update(device='/dev/' + node['name'], filesystem_id=node.get('maj:min'),
                     mounts=mounts, usage=None, usage_status='unmounted')

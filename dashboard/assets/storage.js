@@ -18,6 +18,10 @@
     parent.append(meter,legend);
     if(u.reserved_bytes) parent.append(make('div','storage-note',`${bytes(u.reserved_bytes)} reserved by filesystem`));
   }
+  function header(ok, text) {
+    const h=document.getElementById('hdrstate'); h.className=ok?'st good':'st off';
+    h.replaceChildren(make('i'),make('span','',text));
+  }
   window.neofandStorageRefresh = async () => {
     const host=document.getElementById('storage-drives'), status=document.getElementById('storage-status');
     const controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),8000);
@@ -29,6 +33,7 @@
       const stale=Date.now()/1000-data.timestamp>60;
       status.textContent=`${stale?'Stale snapshot · ':''}Sampled ${new Date(data.timestamp*1000).toLocaleString()} · host samples every 15s`;
       status.classList.toggle('storage-warning',stale);
+      header(!stale,stale?'Storage delayed':'Storage online');
       const totals={raw:0,used:0,available:0}, seen=new Set();
       const cards=data.drives.map(d=>{
         totals.raw+=d.size || 0;
@@ -58,6 +63,7 @@
       window.neofandRuntime?.sample([{ts:data.timestamp}]);
       if(stale)window.neofandRuntime?.error();
     } catch(error) {
+      header(false,'Storage unavailable');
       status.textContent='Storage unavailable — refresh to retry.';status.classList.add('storage-warning');
       host.replaceChildren(make('p','empty','Unable to read the host storage snapshot.'));
       document.getElementById('storage-summary').replaceChildren();
