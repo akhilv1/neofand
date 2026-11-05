@@ -5,7 +5,7 @@ Ubuntu 24.04 amd64 system-container template, based on Proxmox's official signed
 ## Install
 
 1. Download the `.tar.zst` and matching `.sha256` from the private hardware downloads page. On the Proxmox host, place them in `/var/lib/vz/template/cache/`, then run `sha256sum -c IMAGE.tar.zst.sha256`.
-2. Create an **unprivileged** container from the template using the Proxmox GUI. Suggested resources: 1 core, 512 MiB RAM, 2 GiB root disk, DHCP on your private management bridge. Set an SSH public key in the wizard if you want SSH; the Proxmox console also works. No nesting or GPU passthrough required.
+2. Create an **unprivileged** container from the template using the Proxmox GUI. Suggested resources: 1 core, 512 MiB RAM, 2 GiB root disk, DHCP on your private management bridge. SSH is disabled by default; use the Proxmox console. If required, install your SSH public key and explicitly enable SSH only on your private management network. No nesting or GPU passthrough required.
 3. Install the separately packaged `host-collector.tar.gz` on the **physical Proxmox host**: extract it, inspect `install-host-collector.sh`, then run it as root. It installs a dedicated unprivileged sampler user and three read-only collectors; it does not install GPU drivers or change cooling.
 4. While the container is stopped, bind only the output directory read-only. Replace `120` with your unused CT ID:
 
@@ -14,7 +14,15 @@ pct set 120 -mp0 /var/lib/neofand-host,mp=/var/lib/neofand/telemetry,ro=1
 pct start 120
 ```
 
-Open `http://CONTAINER_IP:8080/hardware/`. Restrict access to your management network with the Proxmox firewall, or publish this route using your existing private Tailscale proxy. The API is bound to loopback inside the container. No public ingress, TLS certificate, Tailscale identity or shared password is baked into the template.
+New images listen on **127.0.0.1:8080 only**. Configure a private reverse proxy, or explicitly allow your management interface and client subnet. For example, inside the LXC run `systemctl edit neofand-web` and add (replace the sample address/subnet):
+
+```ini
+[Service]
+Environment=NEOFAND_LISTEN=192.0.2.20
+Environment="NEOFAND_ALLOWED_CIDRS=127.0.0.1/32 ::1/128 192.0.2.0/24"
+```
+
+Then `systemctl daemon-reload && systemctl restart neofand-web`. Open `http://CONTAINER_IP:8080/hardware/` from the allowed management network. A CIDR allowlist is not login authentication. Use TLS and authentication at a private proxy for shared/untrusted networks; optional Caddy authentication snippets can be placed in `/etc/neofand/access/*.caddy`. Never expose this service directly to the internet. Proxmox's `firewall=1` NIC flag alone does not enable the firewall globally. The API is bound to loopback inside the container. No public ingress, TLS certificate, Tailscale identity or shared password is baked into the template.
 
 CLI creation example (choose an unused ID, actual template filename, storage, bridge and public-key path):
 
@@ -27,7 +35,7 @@ pct create 120 local:vztmpl/IMAGE.tar.zst --hostname hardware \
 
 The Linux sampler publishes CPU, host RAM/PSI, readable hwmon temperatures and NVIDIA metrics when host nvidia-smi is available. It retains 30 days of chart history, samples live every 2 seconds and persists history every 30 seconds. Host journal and storage snapshots are refreshed separately. Missing PSU/fan/GPU readings remain unavailable. AMD amdgpu sysfs supplies GPU busy percent, VRAM bytes and temperature when exposed. Intel GPU utilization is not included. Integrated-GPU package power is not mislabeled as board power. On Proxmox, a separate root-local collector uses only `pvesh get` to publish node resource usage, VM/LXC status and recent task results every 60 seconds. No API token is needed and no guest controls are exposed; task usernames, raw logs and guest configurations are excluded. P620 artwork is enabled only when the host identifies as P620; placement and GPU board variant remain illustrative.
 
-An LXC's `/proc` and cgroup readings describe its limits, not necessarily the physical host. Therefore the image deliberately does **not** run the collector itself. With no host bind mount, it shows unavailable telemetry instead of fabricated server readings. Only generated telemetry is shared, never the host root, `/proc`, `/sys`, journals or GPU devices. The snapshot directory is readable by the container's mapped user; SQLite/WAL files are created with umask 0022. Only sanitized event snapshots reach the API.
+An LXC's `/proc` and cgroup readings describe its limits, not necessarily the physical host. Therefore the image deliberately does **not** run the collector itself. With no host bind mount, it shows unavailable telemetry instead of fabricated server readings. Only generated telemetry is shared, never the host root, `/proc`, `/sys`, journals or GPU devices. The snapshot directory is readable by the container's mapped user; SQLite/WAL files are created with umask 0022. Journal message bodies are omitted by default; structured events and metadata reach the API. See [the security model](../../SECURITY.md).
 
 ## Operations
 
@@ -48,3 +56,7 @@ References: [Proxmox container documentation](https://github.com/proxmox/pve-doc
 On Proxmox, the root inventory collector reads ZFS member devices from the host storage snapshot and runs read-only `smartctl -a -j` queries once per minute. Install `smartmontools` on the Proxmox host to enable SMART summaries. Missing or failed readings are shown as unavailable. No self-tests or device settings are changed. The container receives only summarized health fields, without drive serial numbers.
 
 Persistence and per-host centralized archive instructions: [PERSISTENCE.md](../PERSISTENCE.md). The host collector bundle includes `export_history.py`. Central archival is optional and requires an explicitly configured destination.
+
+## Upgrading the host collector
+
+The installer stops its collector services/timers before moving the sampler database, WAL/SHM and ordinary snapshots into `/var/lib/neofand-host/telemetry/`. Root Proxmox and SMART state remain in the root-owned parent. It refuses symlink or ambiguous migration paths. Install the matching new API before restarting the UI: it supports both this nested layout and the old flat Docker layout. Back up the host data first. Do not restore the old collector directory ownership as a workaround.

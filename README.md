@@ -74,3 +74,7 @@ neofand --status  # Read the published snapshot without probing hardware
 [GPU library and builder](dashboard/assets/gpu-library/README.md)
 
 GPL-3.0-or-later. Forked from [T2FanRD](https://github.com/GnomedDev/T2FanRD).
+
+## Security
+
+Read [SECURITY.md](SECURITY.md) before deploying. Dashboard containers require only read-only generated telemetry, not host devices or administrative sockets. New LXC templates are private by default. See the [November 2026 review](docs/security-review-2026-11.md) for fixes, verification and remaining boundaries.

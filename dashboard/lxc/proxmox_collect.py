@@ -8,6 +8,8 @@ import socket
 import subprocess
 import sys
 import time
+import tempfile
+import stat
 
 
 def query(path,*args):
@@ -111,13 +113,14 @@ def normalize_smart(raw,exit_code=0):
 
 
 def storage_health(storage_path):
-    try:storage=json.loads(Path(storage_path).read_text())
+    try:storage=read_storage(storage_path)
     except (OSError,ValueError):return None,[]
     if time.time()-storage.get('timestamp',0)>180:return None,[]
     drives=[];cache={}
-    for drive in storage.get('drives',[]):
+    for drive in storage.get('drives',[])[:128]:
         device=drive.get('device','')
         if not re.fullmatch(r'/dev/(?:nvme\d+n\d+|sd[a-z]+|hd[a-z]+)',device):continue
+        if device in cache:continue
         try:
             r=subprocess.run(['smartctl','-a','-j','-n','standby,3',device],capture_output=True,text=True,timeout=5)
             smart=normalize_smart(json.loads(r.stdout),r.returncode)
@@ -175,18 +178,42 @@ def health_history(previous,drives,now,retention_days=365):
     return dict(timestamp=now,status='ok',retention_days=retention_days,states=states,events=events)
 
 
+def atomic_json(path,data):
+    """Only publish in a trusted root-owned directory; never follow temp symlinks."""
+    path=Path(path)
+    parent=path.parent.stat()
+    if path.parent.is_symlink() or parent.st_uid!=os.geteuid() or parent.st_mode & 0o022:
+        raise PermissionError('Snapshot directory must be owned by this service and not group/world writable')
+    if path.is_symlink():raise PermissionError('Refusing symlink snapshot')
+    fd,temp=tempfile.mkstemp(prefix='.'+path.name+'.',dir=path.parent)
+    try:
+        with os.fdopen(fd,'w') as f:
+            os.fchmod(f.fileno(),0o644)
+            json.dump(data,f);f.flush();os.fsync(f.fileno())
+        os.replace(temp,path)
+        directory=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+        try:os.fsync(directory)
+        finally:os.close(directory)
+    finally:
+        if os.path.exists(temp):os.unlink(temp)
+
+
+def read_storage(path):
+    # This input is produced by a less-privileged sampler: bound it and reject links.
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd) as f:
+        info=os.fstat(f.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size>4*1024*1024:raise ValueError('Invalid storage snapshot')
+        return json.loads(f.read(4*1024*1024+1))
+
+
 def save_health_history(path,drives):
+    if path.is_symlink():raise PermissionError('Refusing symlink health history')
     try:previous=json.loads(path.read_text())
     except FileNotFoundError:previous={}
     # Do not discard a corrupt baseline silently or repeatedly seed false alerts.
     data=health_history(previous,drives,time.time(),max(1,min(3650,int(os.environ.get('NEOFAND_DRIVE_EVENT_RETENTION_DAYS','365')))))
-    tmp=path.with_suffix('.tmp')
-    with tmp.open('w') as f:
-        json.dump(data,f);f.flush();os.fsync(f.fileno())
-    tmp.chmod(0o644);tmp.replace(path)
-    fd=os.open(str(path.parent),os.O_RDONLY)
-    try:os.fsync(fd)
-    finally:os.close(fd)
+    atomic_json(path,data)
 
 
 def normalize(node,status,resources,tasks):
@@ -211,7 +238,8 @@ def main(path):
         data=normalize(node,query('/nodes/'+node+'/status'),query('/cluster/resources'),query('/nodes/'+node+'/tasks','--limit','50'))
         data['storage_uses']=guest_storage(data['guests'])
         data['guest_storage']=guest_capacity(data['guests'],data['storage_uses'])
-        drives,data['pool_health']=storage_health(target.parent/'storage.json')
+        storage=target.parent/'telemetry/storage.json'
+        drives,data['pool_health']=storage_health(storage if storage.exists() else target.parent/'storage.json')
         data['drive_health']=drives or []
         if drives is not None:save_health_history(target.parent/'drive-health-history.json',drives)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError):
@@ -219,6 +247,6 @@ def main(path):
         except (OSError,ValueError):data={'timestamp':0,'guests':[],'tasks':[],'node':node}
         data.update(status='unavailable',attempted_at=time.time())
     target.parent.mkdir(parents=True,exist_ok=True)
-    tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(data));tmp.chmod(0o644);tmp.replace(target)
+    atomic_json(target,data)
 
 if __name__=='__main__':main(sys.argv[1])

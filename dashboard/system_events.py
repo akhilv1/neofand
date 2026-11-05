@@ -20,7 +20,8 @@ def text(value):
 
 def scrub(value):
     value = text(value)
-    value = re.sub(r'(?i)\b(password|passwd|token|secret|api[_-]?key|authorization)\s*[:=]\s*\S+', r'\1=[redacted]', value)
+    value = re.sub(r'(?i)\bAuthorization[\"\']?\s*[:=]\s*[\"\']?(?:Basic|Bearer)\s+[^\s\"\']+', 'Authorization=[redacted]', value)
+    value = re.sub(r'(?i)\b(password|passwd|token|secret|api[_-]?key|authorization)[\"\']?\s*[:=]\s*[\"\']?[^\s\"\']+', r'\1=[redacted]', value)
     value = re.sub(r'(?i)\bBearer\s+\S+', 'Bearer [redacted]', value)
     value = re.sub(r'(https?://)[^/\s@]+@', r'\1[redacted]@', value)
     value = re.sub(r'(https?://[^\s?]+)\?\S+', r'\1?[redacted]', value)
@@ -54,6 +55,9 @@ def record_event(row, power=False):
             kind='power';title='UPS reports utility power restored';severity='info'
         else:
             kind='power';title='UPS event'
+    if os.environ.get('NEOFAND_INCLUDE_JOURNAL_MESSAGES')!='1':
+        message=(title+'. Details retained in the host journal.' if power else
+                 'Journal '+severity+' recorded. Details retained in the host journal.')
     ident=text(row.get('__CURSOR')) or f'{ts}:{unit}:{message}'
     return {'id':hashlib.sha256(ident.encode()).hexdigest()[:24],'ts':ts,'source':'Ubuntu','kind':kind,'title':title,'unit':unit,'message':message,'severity':severity,'confidence':confidence}
 
@@ -122,6 +126,10 @@ def main(path):
     except (OSError,ValueError,RuntimeError,subprocess.TimeoutExpired):
         data={**previous,'status':'unavailable','error':'Ubuntu journal collection failed; retained events may be stale.','attempted_at':time.time()}
         data.setdefault('timestamp',0);data.setdefault('events',[])
+    if os.environ.get('NEOFAND_INCLUDE_JOURNAL_MESSAGES')!='1':
+        for event in data.get('events',[]):
+            if event.get('kind') in ('ubuntu','power'):
+                event['message']='Journal event recorded. Details retained in the host journal.'
     target.parent.mkdir(parents=True,exist_ok=True)
     tmp=target.with_suffix('.tmp');tmp.write_text(json.dumps(data,ensure_ascii=False)+'\n');tmp.chmod(0o644);os.replace(tmp,target)
 

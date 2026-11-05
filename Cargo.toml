@@ -36,7 +36,7 @@ nvidia = ["nvml-wrapper", "nvml-wrapper-sys"]
 logging = ["rusqlite"]
 # Serve the dashboard and JSON query API. Useless without somewhere to query,
 # so it pulls `logging` in rather than silently serving an empty page.
-web = ["logging"]
+web = ["logging", "rusqlite/hooks"]
 
 [profile.release]
 lto = "thin"

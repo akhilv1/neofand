@@ -12,8 +12,10 @@ COPY linux_api.py /opt/neofand/linux_api.py
 COPY Caddyfile /etc/neofand/Caddyfile
 COPY neofand-*.service /etc/systemd/system/
 COPY README.md /opt/neofand/LXC-README.md
-RUN mkdir -p /var/lib/neofand/telemetry && chmod 755 /var/lib/neofand /var/lib/neofand/telemetry && \
+COPY SECURITY.md /opt/neofand/SECURITY.md
+RUN mkdir -p /etc/neofand/access /var/lib/neofand/telemetry && chmod 755 /var/lib/neofand /var/lib/neofand/telemetry && \
     chown -R neofand:neofand /var/lib/neofand && \
+    systemctl disable ssh.service ssh.socket postfix.service && \
     systemctl enable neofand-api.service neofand-web.service neofand-ssh-keys.service && \
     /usr/bin/caddy validate --config /etc/neofand/Caddyfile --adapter caddyfile && \
     rm -f /etc/ssh/ssh_host_* /var/lib/dbus/machine-id /root/.bash_history && \

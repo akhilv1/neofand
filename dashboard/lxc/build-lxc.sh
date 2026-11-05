@@ -27,7 +27,7 @@ if [[ ! -f "$out/$base" ]]; then curl -fsSL "http://download.proxmox.com/images/
 printf '%s  %s\n' "$expected" "$out/$base" | sha512sum -c -
 zstd -dc "$out/$base" | docker import - neofand-lxc-base:ubuntu24.04
 cp "$repo/dashboard/lxc/"{Dockerfile,Caddyfile,README.md,neofand-*.service} "$work/"
-cp "$repo/dashboard/linux/linux_api.py" "$work/"
+cp "$repo/dashboard/linux/linux_api.py" "$repo/SECURITY.md" "$work/"
 mkdir -p "$work/www/assets"
 cp -a "$repo/dashboard/assets/." "$work/www/assets/"
 # Never carry a downloaded distribution or host telemetry into a new image.
@@ -51,6 +51,7 @@ docker export "$export_container" | zstd -T2 -8 -o "$out/$name"
 (cd "$out" && sha256sum "$name" > "$name.sha256")
 mkdir -p "$work/host-collector"
 cp "$repo/dashboard/linux/linux_telemetry.py" "$repo/dashboard/"{system_events.py,storage_collect.py,storage_topology.py,export_history.py,PERSISTENCE.md} "$repo/dashboard/lxc/"{install-host-collector.sh,proxmox_collect.py} "$work/host-collector/"
+cp "$repo/SECURITY.md" "$work/host-collector/"
 tar czf "$out/host-collector.tar.gz" -C "$work" host-collector
 (cd "$out" && sha256sum host-collector.tar.gz > host-collector.tar.gz.sha256)
 docker run --rm --entrypoint dpkg-query "$image" -W > "$out/packages-${commit:0:7}.txt"
