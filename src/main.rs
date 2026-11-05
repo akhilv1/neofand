@@ -781,6 +781,7 @@ fn real_main() -> Result<()> {
         nvidia::NvidiaBackend::init(
             config.gpu.sensor_preference.wants_memory(),
             config.gpu_fans,
+            config.gpu.power_limit_watts,
         )
     } else {
         None
