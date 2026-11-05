@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  let models = [], selected, view = 'face';
+  let models = [], selected, view = 'edge';
   function sourceLink(value) { const u=new URL(value); return u.protocol === 'https:' ? u.href : '#'; }
   function occupancy() {
     if (!selected) return;
@@ -16,7 +16,10 @@
     $('family').textContent=`${model.vendor} · ${model.category}`;
     $('name').textContent=model.name; $('variant').textContent=model.variant;
     const path=`models/${model.id}-${view}.svg`;
-    $('model-image').src=path; $('model-image').alt=`${model.name} ${view} schematic`;
+    const rendered = view === 'edge' && model.render_preview;
+    $('model-image').src=rendered || path;
+    $('model-image').alt=rendered ? `${model.name} illustrative installed profile` : `${model.name} ${view} schematic`;
+    $('preview-caption').textContent=rendered ? 'Illustrative installed profile · published dimensions below' : 'Schematic artwork · dimensional envelope';
     $('source').href=sourceLink(model.source); $('download').href=path;
     for (const [id,key] of [['render-preview','render_preview'],['chassis-reference','chassis_reference']]) {
       const link=$(id); link.hidden=!model[key]; if(model[key])link.href=model[key];
