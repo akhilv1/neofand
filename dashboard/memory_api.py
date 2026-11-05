@@ -39,6 +39,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/storage.json').read_text())
+            if self.path == '/storage':
+                try:
+                    data['breakdown'] = json.loads(Path('/host/telemetry/storage-breakdown.json').read_text())
+                except (OSError, ValueError):
+                    data['breakdown'] = None
             body = json.dumps(data, allow_nan=False).encode()
         except (OSError, ValueError, KeyError):
             self.send_error(503, 'Host memory readings unavailable')

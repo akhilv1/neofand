@@ -7,7 +7,7 @@
     return `${n.toLocaleString(undefined,{maximumFractionDigits: i ? 1 : 0})} ${['B','KiB','MiB','GiB','TiB'][i]}`;
   };
   const flatten = n => [n,...(n.children || []).flatMap(flatten)];
-  function usage(parent, u) {
+  function usage(parent, u, showMeter=true) {
     const pct = u.total_bytes ? Math.min(100,Math.max(0,u.used_bytes/u.total_bytes*100)) : 0;
     const meter=make('div','storage-meter'); meter.setAttribute('role','meter');
     meter.setAttribute('aria-label','Filesystem space used'); meter.setAttribute('aria-valuemin','0'); meter.setAttribute('aria-valuemax','100'); meter.setAttribute('aria-valuenow',pct.toFixed(1));
@@ -15,7 +15,8 @@
     const reserved=make('span','storage-reserved'); reserved.style.width=`${u.total_bytes ? u.reserved_bytes/u.total_bytes*100 : 0}%`; meter.append(reserved);
     const legend=make('div','storage-values');
     legend.append(make('strong','',`${bytes(u.used_bytes)} used · ${pct.toFixed(1)}%`),make('span','',`${bytes(u.available_bytes)} available`));
-    parent.append(meter,legend);
+    if(showMeter)parent.append(meter);
+    parent.append(legend);
     if(u.reserved_bytes) parent.append(make('div','storage-note',`${bytes(u.reserved_bytes)} reserved by filesystem`));
   }
   function header(ok, text) {
@@ -47,7 +48,9 @@
           const row=make('div','storage-filesystem');
           row.append(make('h4','',`${n.mounts.join(', ') || n.device}`),make('div','storage-note',`${n.device} · ${n.fstype || n.type} · ${bytes(n.size)} partition/device`));
           if(n.usage){
-            usage(row,n.usage);
+            const scan=data.breakdown?.filesystems?.find(f=>f.filesystem_id===n.filesystem_id);
+            usage(row,n.usage,!scan || Boolean(scan.error));
+            row.append(window.neofandStorageBreakdown(n.usage,scan));
             if(!seen.has(n.filesystem_id)){seen.add(n.filesystem_id); totals.used+=n.usage.used_bytes;totals.available+=n.usage.available_bytes;}
           } else row.append(make('p','storage-note',n.usage_status==='unmounted'?'Not mounted · usage unavailable':'Usage unavailable · mount could not be measured'));
           card.append(row);

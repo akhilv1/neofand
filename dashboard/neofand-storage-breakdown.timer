@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh storage categories every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30min
+AccuracySec=30s
+Unit=neofand-storage-breakdown.service
+
+[Install]
+WantedBy=timers.target
