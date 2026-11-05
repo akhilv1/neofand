@@ -65,7 +65,7 @@ html=html.replace('const TABS = ["overview", "power", "thermal", "sensors", "sto
 html=html.replace('else if (state.tab === "errors") await loadEvents();','else if (state.tab === "proxmox") await window.neofandProxmoxRefresh();\n    else if (state.tab === "errors") await loadEvents();')
 html=html.replace('const SECTION_REQS = {',"const SECTION_REQS = {\n  'proxmox-resources': () => !window.neofandHostInfo || Boolean(window.neofandHostInfo.proxmox_available),")
 html=html.replace('window.neofandHostConnected?.(d);renderSummary();','window.neofandHostConnected?.(d);renderSummary();applyVisibility();document.body.classList.toggle("pve-host",Boolean(d.proxmox_available));')
-html=html.replace('</head>','<script src="/hardware/assets/proxmox.js" defer></script></head>')
+html=html.replace('</head>','<script src="/hardware/assets/proxmox.js?v=20261105-ownership" defer></script></head>')
 output.write_text(html)
 
 # Default the GPU builder to this host's platform; saved layouts still take precedence.
