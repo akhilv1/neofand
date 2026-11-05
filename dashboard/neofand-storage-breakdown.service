@@ -5,7 +5,7 @@ After=neofand-storage.service
 [Service]
 Type=oneshot
 User=neo
-ExecStart=/usr/bin/python3 -B /home/neo/services/neofand-dashboard/storage_breakdown.py /home/neo/services/neofand-dashboard/telemetry/storage.json /home/neo/services/neofand-dashboard/telemetry/storage-breakdown.json
+ExecStart=/usr/bin/python3 -B /home/neo/services/neofand-dashboard/storage_index.py /home/neo/services/neofand-dashboard/telemetry/storage.json /home/neo/services/neofand-dashboard/telemetry/storage-breakdown.json
 Nice=19
 IOSchedulingClass=idle
 CPUQuota=50%

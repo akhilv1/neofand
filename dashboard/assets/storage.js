@@ -7,7 +7,7 @@
     return `${n.toLocaleString(undefined,{maximumFractionDigits: i ? 1 : 0})} ${['B','KiB','MiB','GiB','TiB'][i]}`;
   };
   const flatten = n => [n,...(n.children || []).flatMap(flatten)];
-  const filesystemName = n => ({apfs:'APFS',exfat:'exFAT',ext4:'ext4',xfs:'XFS',vfat:'FAT',ntfs:'NTFS',btrfs:'Btrfs',crypto_LUKS:'LUKS',swap:'Swap'}[n.fstype] || n.fstype || n.parttypename || 'Unknown type');
+  const filesystemName = n => ({zfs_member:'ZFS member',linux_raid_member:'RAID member',LVM2_member:'LVM member',apfs:'APFS',exfat:'exFAT',ext4:'ext4',xfs:'XFS',vfat:'FAT',ntfs:'NTFS',btrfs:'Btrfs',crypto_LUKS:'LUKS',swap:'Swap'}[n.fstype] || n.fstype || n.parttypename || 'Unknown type');
   function unknownUsage(parent, n) {
     const legend=make('div','storage-values storage-unknown-values');
     legend.append(make('strong','','Unknown storage usage'),make('span','',`${bytes(n.size)} partition`));
@@ -45,40 +45,52 @@
       status.classList.toggle('storage-warning',stale);
       header(!stale,stale?'Storage delayed':'Storage online');
       const totals={raw:0,used:0,available:0}, seen=new Set();
-      const cards=data.drives.map(d=>{
-        totals.raw+=d.size || 0;
-        const card=make('article','storage-drive');
-        const heading=make('div','storage-drive-heading');
-        const title=make('div'); title.append(make('h3','',d.model?.trim() || d.name),make('div','storage-note',`${d.device} · ${d.tran?.toUpperCase() || (d.name.startsWith('nvme')?'NVMe':'Block device')} · ${d.rota?'HDD':'SSD'}`));
-        heading.append(title,make('strong','storage-capacity',bytes(d.size))); card.append(heading);
-        const nodes=flatten(d).filter(n=>!n.auxiliary && (n.type==='part'||n.fstype||n.mounts.length));
-        if(!nodes.length){
-          if(!d.children?.length)unknownUsage(card,d);
-          else card.append(make('p','storage-note','No data partitions to display.'));
-        }
-        nodes.forEach(n=>{
+      function renderFilesystem(n){
+
           const row=make('div','storage-filesystem');
           const partitionHeading=make('div','storage-partition-heading');
           const badge=make('span','storage-type-badge',filesystemName(n));
           badge.title=[n.parttypename,n.parttype].filter(Boolean).join(' · ');
           partitionHeading.append(make('h4','',n.mounts.join(', ') || n.parttypename || 'Data partition'),badge);
           row.append(partitionHeading,make('div','storage-note storage-partition-meta',`${n.device} · ${bytes(n.size)}${n.mounts.length && n.parttypename ? ' · '+n.parttypename : ''}`));
-          if(n.usage){
+          if(n.usage)row.append(window.neofandStorageIndexStatus(n.filesystem_id,data.index_progress));
+          if(n.member_of?.length && !n.usage){
+            row.append(make('p','storage-note','Member device · shared usage is shown with its storage group.'));
+            const refs=[...(n.child_ids||[]).map(id=>({id,name:(data.volumes||[]).find(v=>v.filesystem_id===id)?.device || id})),...(n.pool_ids||[]).map(id=>({id,name:id.replace(/^zfs:/,'')}))];
+            window.neofandStorageGroups.links(row,refs);
+          } else if(n.usage){
             const scan=data.breakdown?.filesystems?.find(f=>f.filesystem_id===n.filesystem_id);
             usage(row,n.usage,!scan || Boolean(scan.error));
             row.append(window.neofandStorageBreakdown(n.usage,scan));
             if(!seen.has(n.filesystem_id)){seen.add(n.filesystem_id); totals.used+=n.usage.used_bytes;totals.available+=n.usage.available_bytes;}
           } else unknownUsage(row,n);
-          card.append(row);
-        });
+          return row;
+      }
+      const cards=data.drives.map(d=>{
+        totals.raw+=d.size || 0;
+        const card=make('article','storage-drive');
+        const heading=make('div','storage-drive-heading');
+        const title=make('div'),titleLine=make('div','storage-title-line');titleLine.append(make('h3','',d.model?.trim() || d.name));window.neofandStorageGroups.badges(titleLine,d.roles);title.append(titleLine,make('div','storage-note',`${d.device} · ${d.tran?.toUpperCase() || (d.name.startsWith('nvme')?'NVMe':'Block device')} · ${d.rota?'HDD':'SSD'}`));
+        heading.append(title,make('strong','storage-capacity',bytes(d.size))); card.append(heading);
+        window.neofandStorageGroups.links(card,d.memberships);
+        const nodes=(d.display_nodes || flatten(d)).filter(n=>!n.auxiliary && (n.type==='part'||n.fstype||n.mounts.length));
+        if(!nodes.length){
+          if(!d.children?.length)unknownUsage(card,d);
+          else card.append(make('p','storage-note','No data partitions to display.'));
+        }
+        nodes.forEach(n=>card.append(renderFilesystem(n)));
         return card;
       });
+      const shared=window.neofandStorageGroups.groups(data,renderFilesystem);
+      if(shared.length)cards.unshift(...shared);
+      if(data.totals){totals.used=data.totals.used_bytes;totals.available=data.totals.available_bytes;}
+      for(const notice of data.notices||[])cards.unshift(make('p','storage-note storage-warning',notice));
       const expanded=new Set([...host.querySelectorAll('details[open]')].map(e=>e.dataset.storageKey));
       host.replaceChildren(...cards);
       host.querySelectorAll('details').forEach(e=>{e.open=expanded.has(e.dataset.storageKey);});
       if(!cards.length)host.append(make('p','','No physical drives detected.'));
       const summary=document.getElementById('storage-summary'); summary.replaceChildren();
-      for(const [label,value] of [['Physical drives',String(data.drives.length)],['Raw capacity',bytes(totals.raw)],['Measured used',bytes(totals.used)],['Available on mounted filesystems',bytes(totals.available)]]){
+      for(const [label,value] of [['Physical drives',String(data.drives.length)],['Raw capacity',bytes(totals.raw)],['Accounted used',bytes(totals.used)],['Available (shared space counted once)',bytes(totals.available)]]){
         const item=make('div'); item.append(make('span','storage-note',label),make('strong','',value));summary.append(item);
       }
       window.neofandRuntime?.sample([{ts:data.timestamp}]);

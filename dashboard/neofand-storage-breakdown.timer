@@ -1,9 +1,9 @@
 [Unit]
-Description=Refresh storage categories every 30 minutes
+Description=Refresh storage categories metadata index reconciliation
 
 [Timer]
 OnBootSec=2min
-OnUnitInactiveSec=30min
+OnUnitInactiveSec=5min
 AccuracySec=30s
 Unit=neofand-storage-breakdown.service
 

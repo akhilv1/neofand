@@ -304,9 +304,11 @@
 <link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-7">
 <link rel="stylesheet" href="/hardware/assets/runtime.css?v=20261104-7">
 <script src="/hardware/assets/runtime.js?v=20261105-2" defer></script>
-<link rel="stylesheet" href="/hardware/assets/storage.css?v=20261105-5">
+<link rel="stylesheet" href="/hardware/assets/storage.css?v=20261105-7">
 <script src="/hardware/assets/storage-breakdown.js?v=20261105-4"></script>
-<script src="/hardware/assets/storage.js?v=20261105-5"></script>
+<script src="/hardware/assets/storage-index.js?v=20261105-7"></script>
+<script src="/hardware/assets/storage-groups.js?v=20261105-7"></script>
+<script src="/hardware/assets/storage.js?v=20261105-7"></script>
 </head>
 <body>
 
@@ -344,7 +346,7 @@
 
   <main>
     <div class="filters">
-      <label for="range">Range</label>
+      <label for="range" id="range-label">Range</label>
       <select id="range">
         <option value="3600">Last hour</option>
         <option value="21600" selected>Last 6 hours</option>
@@ -364,7 +366,7 @@
       <section class="card storage-intro"><h2>Storage</h2>
         <p class="storage-note">See what’s using each drive. Categories estimate Models, Photos, Backups and more from filenames and folders. Expand a category to see its largest contributors.</p>
         <div id="storage-summary"></div><div id="storage-status" class="storage-note">Loading storage…</div>
-        <p class="storage-note">Binary units (GiB / TiB). Raw capacity includes partitions, filesystem metadata and unallocated space. EFI and metadata partitions are hidden; raw capacity includes them. Unreadable partitions show unknown usage. Category scans run every 30 minutes; space totals refresh separately. The range selector applies to charts.</p>
+        <p class="storage-note">Binary units (GiB / TiB). Raw capacity includes partitions, filesystem metadata and unallocated space. EFI and metadata partitions are hidden; raw capacity includes them. Unreadable partitions show unknown usage. The metadata index reconciles about every 30 minutes; cached categories remain visible during updates. Space totals refresh separately. Storage shows the latest snapshot.</p>
       </section><div id="storage-drives"></div>
     </div>
     <!-- Dashboard -->
@@ -1557,6 +1559,9 @@ function applyVisibility() {
 const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];
 function selectTab(name) {
   state.tab = name;
+  const historical = ['overview','power','thermal','errors'].includes(name);
+  $('range').hidden = !historical;
+  $('range-label').hidden = !historical;
   document.querySelectorAll(".rail a[data-tab]").forEach(x => x.classList.toggle("sel", x.dataset.tab === name));
   TABS.forEach(t => { const p = $("tab-" + t); if (p) p.hidden = t !== name; });
   buildStrip();

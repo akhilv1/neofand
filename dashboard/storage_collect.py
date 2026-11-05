@@ -6,23 +6,23 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from storage_topology import parse_mountinfo, discover_zfs, enrich
 
 
 def collect():
     result = subprocess.run(['lsblk', '--json', '--bytes', '--exclude', '7', '--output',
-                             'NAME,TYPE,SIZE,MODEL,FSTYPE,PARTTYPE,PARTTYPENAME,MOUNTPOINTS,MAJ:MIN,ROTA,TRAN'],
+                             'NAME,KNAME,TYPE,SIZE,MODEL,FSTYPE,PARTTYPE,PARTTYPENAME,MOUNTPOINTS,MAJ:MIN,ROTA,TRAN'],
                             check=True, capture_output=True, text=True, timeout=10)
     devices = json.loads(result.stdout)['blockdevices']
     # systemd hardening creates private bind mounts; use PID 1's host mount table.
+    mounts = parse_mountinfo(Path('/proc/1/mountinfo').read_text())
     host_mounts = {}
-    for line in Path('/proc/1/mountinfo').read_text().splitlines():
-        fields = line.split()
-        mount = re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), fields[4])
-        host_mounts.setdefault(fields[2], []).append(mount)
+    for mount in mounts:
+        host_mounts.setdefault(mount['id'], []).append(mount['path'])
 
     def describe(node):
         mounts = list(dict.fromkeys(host_mounts.get(node.get('maj:min'), [])))
-        item = {key: node.get(key) for key in ('name', 'type', 'size', 'model', 'fstype', 'rota', 'tran', 'parttype', 'parttypename')}
+        item = {key: node.get(key) for key in ('name', 'kname', 'type', 'size', 'model', 'fstype', 'rota', 'tran', 'parttype', 'parttypename')}
         partition_type = (node.get('parttypename') or '').lower()
         item['auxiliary'] = partition_type in {'efi system', 'bios boot', 'microsoft reserved', 'apple boot', 'apple label'} or 'metadata' in partition_type
         item.update(device='/dev/' + node['name'], filesystem_id=node.get('maj:min'),
@@ -45,7 +45,11 @@ def collect():
         item['children'] = [describe(child) for child in node.get('children', [])]
         return item
 
-    return {'timestamp': int(time.time()), 'drives': [describe(d) for d in devices if d['type'] == 'disk']}
+    physical = [d for d in devices if d['type']=='disk' and not (d.get('kname') or d['name']).startswith('zd')]
+    snapshot = {'timestamp': int(time.time()), 'drives': [describe(d) for d in physical]}
+    snapshot['unbacked_nodes'] = [describe(d) for d in devices if d['type'] not in {'disk','loop'}]
+    pools, zfs_status = discover_zfs(mounts)
+    return enrich(snapshot, mounts, pools, zfs_status)
 
 
 def main():

@@ -67,3 +67,20 @@ The collector includes the OS-reported GPT partition type and name. The UI hides
 ## OEM GPU system builder
 
 The GPU library now contains 55 OEM/reference profiles and a Mac Pro chassis builder with mixed-card placement, measured overrides, saved layouts, JSON import/export, and collision/length checks. It records published slot widths, derives connector spacing from a configurable nominal 20.32 mm pitch, reserves Apple I/O and MPX connector pairs, and limits MPX to two modules. Missing dimensions remain visibly uncertain. Popular OEM families use clean installed-side renders; other models have distinct board-family illustrations. See `assets/gpu-library/README.md` and `assets/gpu-library/builder/SLOT-MECHANICS.md`.
+
+
+### Storage topology and persistent indexing
+
+The current collector collapses repeated lsblk nodes by device identity, so Linux md RAID and LVM filesystems are shown once with their backing drives. System identifies the running root filesystem; Boot identifies a currently mounted /boot, /boot/efi or /efi filesystem. Roles propagate to backing drives, including hidden EFI partitions. An unused EFI partition alone does not receive a Boot badge.
+
+When installed, unprivileged zpool/zfs commands discover pool health, vdev layout (including mirrors/RAIDZ), dataset mounts and snapshots. Pool root used/available values enter totals once; child dataset availability is shared and never summed. Raw pool allocation is shown separately. Missing tools or permissions produce an explicit limitation. No pool is created or changed. LVM filesystem usage is supported; unallocated VG and thin-pool headroom are not included. ZFS/md/LVM behavior is fixture-tested; this deployment currently has none of those active pools.
+
+storage_index.py supersedes the periodic one-shot scanner, retaining its category helpers. It stores per-directory metadata and classifications in telemetry/storage-index.sqlite3, with a persistent pending-directory queue, resumable reconciliation, inode-based hard-link deduplication and unchanged-entry cache reuse. It reads metadata only and skips nested mounts and symlinks. Atomic JSON snapshots retain the last completed categories while progress reports checked files, discovered directories remaining, and cache hits. The total file count is unknown during traversal, so the UI uses an indeterminate progress bar rather than a fabricated percentage.
+
+The index timer wakes five minutes after a run; completed filesystems are reconciled after 30 minutes, and unfinished work resumes. Each run has an 1100-second budget, nice 19, idle I/O, 50% CPU quota and 512 MiB limit. These settings supersede the older scan schedule above. This is a persistent metadata cache with periodic reconciliation, not native filesystem journal or event tracking. Protected files remain unclassified. Current capacity samples continue every 15 seconds independently. Refresh reads cached data and does not traverse drives.
+
+Range controls appear only on history-based Dashboard, Power, Thermal and Event log panels. Storage, Sensors, Services and Boot show current snapshots.
+
+Validation: python3 -B -m unittest test_storage_breakdown test_storage_topology test_storage_index from dashboard/. Tests cover duplicate md/LVM paths, ZFS shared accounting and role propagation, mount boundaries, cache reuse, deletion, restart/resume, hard links and symlinks.
+
+References: https://man7.org/linux/man-pages/man8/lsblk.8.html ; https://docs.kernel.org/admin-guide/md.html ; https://openzfs.github.io/openzfs-docs/man/v2.2/8/zpool-status.8.html ; https://openzfs.github.io/openzfs-docs/man/v2.2/7/zfsprops.7.html

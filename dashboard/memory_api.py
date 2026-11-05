@@ -44,6 +44,10 @@ class Handler(BaseHTTPRequestHandler):
                     data['breakdown'] = json.loads(Path('/host/telemetry/storage-breakdown.json').read_text())
                 except (OSError, ValueError):
                     data['breakdown'] = None
+                try:
+                    data['index_progress'] = json.loads(Path('/host/telemetry/storage-index-progress.json').read_text())
+                except (OSError, ValueError):
+                    data['index_progress'] = None
             body = json.dumps(data, allow_nan=False).encode()
         except (OSError, ValueError, KeyError):
             self.send_error(503, 'Host memory readings unavailable')

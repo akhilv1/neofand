@@ -106,14 +106,16 @@ def collect(snapshot):
         yield n
         for child in n.get('children',[]):yield from walk(child)
     deadline=time.monotonic()+1100
-    for drive in snapshot['drives']:
-        for n in walk(drive):
-            fsid=n['filesystem_id']
-            if not n.get('usage') or not n.get('mounts') or fsid in seen:continue
-            seen.add(fsid)
-            mount=min(n['mounts'],key=len)
-            try: results.append(scan(mount,fsid,boundaries,deadline))
-            except OSError:results.append(dict(filesystem_id=fsid,mount=mount,error='Filesystem unavailable'))
+    targets = snapshot.get('scan_targets')
+    if targets is None:
+        targets = [n for drive in snapshot['drives'] for n in walk(drive)]
+    for n in targets:
+        fsid=n['filesystem_id']
+        if not n.get('usage') or not n.get('mounts') or fsid in seen:continue
+        seen.add(fsid)
+        mount=min(n['mounts'],key=len)
+        try: results.append(scan(mount,fsid,boundaries,deadline))
+        except OSError:results.append(dict(filesystem_id=fsid,mount=mount,error='Filesystem unavailable'))
     return dict(timestamp=int(time.time()),filesystems=results,method='allocated blocks; path and extension classification')
 
 
