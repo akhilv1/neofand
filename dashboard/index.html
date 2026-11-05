@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hardware · NeoCharge</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * Chrome palette: BMC-console idiom -- navy rail, dense light content.
+   * Chart surfaces are kept close to the data-viz reference surfaces
+   * (#fcfcfb light / #1a1a19 dark) so the documented palette validation
+   * still describes what actually renders.
+   * ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+    --rail:        #1b2a3a;
+    --rail-2:      #16222f;
+    --rail-ink:    #c8d4e0;
+    --rail-ink-hi: #ffffff;
+    --rail-sel:    #2076c4;
+    --bar:         #121c27;
+    --bg:          #eef1f5;
+    --panel:       #ffffff;
+    --panel-head:  #f4f6f9;
+    --ink:         #16202b;
+    --muted:       #5d6b7a;
+    --line:        #d3dae2;
+    --grid:        #e9edf2;
+    --accent:      #1668b3;
+
+    --surface-1:   #fcfcfb;   /* chart plot surface */
+    --axis:        #b9c2cc;
+
+    --good:        #0ca30c;
+    --warning:     #fab219;
+    --serious:     #ec835a;
+    --critical:    #d03b3b;
+
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --rail: #141c26; --rail-2: #10161e; --rail-ink: #9fb0c2; --rail-ink-hi: #ffffff;
+      --bar: #0c121a; --bg: #0f141b; --panel: #171c24; --panel-head: #1c222b;
+      --ink: #e6eaef; --muted: #97a3b2; --line: #2a323d; --grid: #212932;
+      --accent: #4f9de0; --surface-1: #1a1a19; --axis: #465360;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --rail: #141c26; --rail-2: #10161e; --rail-ink: #9fb0c2; --rail-ink-hi: #ffffff;
+    --bar: #0c121a; --bg: #0f141b; --panel: #171c24; --panel-head: #1c222b;
+    --ink: #e6eaef; --muted: #97a3b2; --line: #2a323d; --grid: #212932;
+    --accent: #4f9de0; --surface-1: #1a1a19; --axis: #465360;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* MUST come before any class that sets `display`.
+   *
+   * The UA stylesheet's `[hidden] { display: none }` is a single attribute
+   * selector, so ANY class rule that sets display beats it. The tab panes are
+   * `<div class="grid" hidden>`, and `.grid { display: grid }` silently won --
+   * so no pane ever hid, every tab rendered stacked at once, and only the active
+   * tab's charts got data. That is what "dead tabs and tables" actually was.
+   * `!important` here is deliberate: hidden must outrank every layout class. */
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13.5px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---- top bar ---- */
+  .topbar {
+    height: 48px; background: var(--bar); color: #fff; display: flex; align-items: center;
+    gap: 10px; padding: 0 12px; position: sticky; top: 0; z-index: 40;
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+  .topbar .brand { font-weight: 650; letter-spacing: .02em; font-size: 14px; white-space: nowrap; }
+  .topbar .host { color: #8fa5bb; font-size: 12.5px; white-space: nowrap;
+                  overflow: hidden; text-overflow: ellipsis; }
+  .topbar .spacer { flex: 1; }
+  .iconbtn {
+    background: none; border: 1px solid transparent; color: #cfe0f0; border-radius: 6px;
+    width: 40px; height: 40px; display: none; align-items: center; justify-content: center;
+    cursor: pointer; flex: none;
+  }
+  .iconbtn:hover { background: #ffffff1a; }
+
+  /* ---- layout ---- */
+  .shell { display: flex; min-height: calc(100vh - 48px); }
+  .rail {
+    width: 208px; flex: none; background: var(--rail); color: var(--rail-ink);
+    padding: 8px 0 24px; position: sticky; top: 48px; height: calc(100vh - 48px);
+    overflow-y: auto; padding-left: env(safe-area-inset-left);
+  }
+  .rail .grp { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
+               color: #7e93a8; padding: 14px 16px 6px; font-weight: 650; }
+  .rail a {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px; color: var(--rail-ink);
+    text-decoration: none; font-size: 13.5px; border-left: 3px solid transparent; cursor: pointer;
+    min-height: 42px;
+  }
+  .rail a:hover { background: var(--rail-2); color: var(--rail-ink-hi); }
+  .rail a.sel { background: var(--rail-2); color: var(--rail-ink-hi); border-left-color: var(--rail-sel); font-weight: 600; }
+  .rail svg { width: 16px; height: 16px; flex: none; opacity: .85; }
+  .scrim { display: none; }
+
+  main { flex: 1; min-width: 0; padding: 14px; padding-right: max(14px, env(safe-area-inset-right)); }
+
+  /* Mobile tab strip. Hidden on desktop, where the rail is always visible.
+     On a phone it replaces the drawer outright: a console with seven sections
+     should not hide its navigation behind a hamburger nobody taps. */
+  .tabstrip { display: none; }
+
+  /* ---- filter row: one row, above the content it scopes ---- */
+  .filters {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+    padding: 8px 10px; margin-bottom: 12px;
+  }
+  .filters label { color: var(--muted); font-size: 12px; }
+  select, button.btn {
+    font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; padding: 7px 10px; min-height: 38px;
+  }
+  button.btn { cursor: pointer; }
+  button.btn:hover { border-color: var(--accent); }
+  button.btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.danger { border-color: var(--critical); color: var(--critical); }
+  button.btn.danger:hover:not(:disabled) { background: var(--critical); color: #fff; }
+  button.btn:disabled { opacity: .45; cursor: not-allowed; }
+  .stamp { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  /* ---- cards ---- */
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .card.wide { grid-column: 1 / -1; }
+  .card > h2 {
+    margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+    background: var(--panel-head); border-bottom: 1px solid var(--line); padding: 9px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card > h2 .tail { margin-left: auto; display: flex; gap: 6px; }
+  .card > h2 button {
+    font: inherit; font-size: 11px; text-transform: none; letter-spacing: 0;
+    background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    border-radius: 3px; padding: 3px 8px; cursor: pointer; min-height: 28px;
+  }
+  .card > h2 button.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .body { padding: 12px; }
+  .sub { color: var(--muted); font-size: 12px; margin: -2px 0 10px; }
+  .note {
+    border-left: 3px solid var(--warning); background: var(--panel-head);
+    padding: 9px 12px; font-size: 12.5px; margin-bottom: 12px; border-radius: 0 3px 3px 0;
+  }
+
+  /* ---- charts ---- */
+  .plot { position: relative; background: var(--surface-1); border: 1px solid var(--grid); border-radius: 3px; }
+  canvas { width: 100%; height: 210px; display: block; touch-action: pan-y; }
+  .tip {
+    position: absolute; pointer-events: none; z-index: 5; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; font-size: 12px;
+    box-shadow: 0 4px 14px #0000002e; min-width: 132px; display: none;
+  }
+  .tip .when { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+  .tip .r { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tip .r b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .tip .r span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  .tip .k { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+  .legend .k { width: 14px; height: 2px; border-radius: 1px; display: inline-block; margin-right: 6px; vertical-align: 3px; }
+
+  /* ---- tables: always able to scroll inside their own box ---- */
+  .tw { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:hover { background: var(--panel-head); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .dim { color: var(--muted); }
+
+  /* status: never colour alone -- dot + word ---- */
+  .st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 600; }
+  .st i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .st.good { color: var(--good); } .st.good i { background: var(--good); }
+  .st.warn { color: #8a6100; } .st.warn i { background: var(--warning); }
+  .st.crit { color: var(--critical); } .st.crit i { background: var(--critical); }
+  .st.off  { color: var(--muted); } .st.off i { background: var(--muted); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .st.warn { color: var(--warning); } }
+  :root[data-theme="dark"] .st.warn { color: var(--warning); }
+
+  .bar { height: 6px; background: var(--grid); border-radius: 3px; overflow: hidden; min-width: 70px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar > i.warn { background: var(--warning); } .bar > i.crit { background: var(--critical); }
+
+  #picker { max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; padding: 6px 10px; }
+  #picker label { display: flex; gap: 8px; align-items: center; padding: 5px 0; cursor: pointer; font-size: 12.5px; min-height: 32px; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 14px 0; }
+  .kv th { width: 150px; text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ---------------- mobile ---------------- */
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) {
+    /* The strip replaces both the rail and the hamburger. */
+    .iconbtn { display: none; }
+    .rail, .scrim { display: none !important; }
+    .tabstrip {
+      display: flex; gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      background: var(--rail); position: sticky; top: 48px; z-index: 35;
+      scrollbar-width: none; box-shadow: inset 0 -1px 0 #0004;
+      padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
+    }
+    .tabstrip::-webkit-scrollbar { display: none; }
+    .tabstrip button {
+      flex: 0 0 auto; background: none; border: none; color: var(--rail-ink);
+      font: inherit; font-size: 13px; font-weight: 550; padding: 12px 15px;
+      border-bottom: 3px solid transparent; white-space: nowrap; cursor: pointer;
+      min-height: 46px;
+    }
+    .tabstrip button.sel { color: var(--rail-ink-hi); border-bottom-color: var(--rail-sel); }
+    .rail {
+      position: fixed; top: 48px; left: 0; bottom: 0; height: auto; z-index: 35;
+      transform: translateX(-100%); transition: transform .18s ease; width: 250px;
+      box-shadow: 2px 0 16px #00000040;
+    }
+    body.nav .rail { transform: none; }
+    body.nav .scrim { display: block; position: fixed; inset: 48px 0 0; background: #0009; z-index: 30; }
+    main { padding: 10px; }
+    .card > h2 { padding: 10px 12px; }
+    .body { padding: 10px; }
+    canvas { height: 185px; }
+    th, td { padding: 9px 10px 9px 0; }
+    .stamp { margin-left: 0; width: 100%; }
+    .filters { gap: 6px; }
+    select, button.btn { flex: 1 1 auto; min-width: 84px; }
+  }
+  @media (max-width: 400px) { canvas { height: 165px; } .topbar .host { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .rail { transition: none; } }
+
+  /* NeoCharge Pilot visual language. */
+  :root {
+    --rail: #ffffff; --rail-2: #eaf3e8; --rail-ink: #64776e;
+    --rail-ink-hi: #234831; --rail-sel: #328d73;
+    --bar: #193e34; --bg: #f6f8f7; --panel: #ffffff;
+    --panel-head: #f8faf8; --ink: #1c3431; --muted: #6d7e77;
+    --line: #e4ebe7; --grid: #ebf0ed; --accent: #267a65;
+    --surface-1: #fcfdfc; --axis: #b9c9c0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --rail: #142b26; --rail-2: #20443a; --rail-ink: #abc8ba;
+      --rail-ink-hi: #e8f5ec; --rail-sel: #9bd9a6;
+      --bar: #10241f; --bg: #10201c; --panel: #19332b;
+      --panel-head: #1e3b32; --ink: #ecf5ef; --muted: #b0c6b8;
+      --line: #315247; --grid: #29443a; --accent: #8bd6ad;
+      --surface-1: #142820; --axis: #587669;
+    }
+  }
+  :root[data-theme="dark"] {
+    --rail: #142b26; --rail-2: #20443a; --rail-ink: #abc8ba;
+    --rail-ink-hi: #e8f5ec; --rail-sel: #9bd9a6;
+    --bar: #10241f; --bg: #10201c; --panel: #19332b;
+    --panel-head: #1e3b32; --ink: #ecf5ef; --muted: #b0c6b8;
+    --line: #315247; --grid: #29443a; --accent: #8bd6ad;
+    --surface-1: #142820; --axis: #587669;
+  }
+  body { font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 14px; }
+  .topbar { height: 60px; padding-inline: 24px; border-bottom: 1px solid #31574b; }
+  .topbar .brand { font-size: 17px; font-weight: 700; letter-spacing: -.025em; }
+  .brand-divider { color: #a9daaf; padding-inline: 5px; }
+  .topbar .host { color: #c2d9cb; }
+  .shell { min-height: calc(100vh - 60px); }
+  .rail { top: 60px; height: calc(100vh - 60px); width: 222px; border-right: 1px solid var(--line); }
+  .rail .grp { color: var(--muted); letter-spacing: .12em; padding-top: 22px; }
+  .rail a { margin: 3px 10px; border-left: 0; border-radius: 8px; padding: 10px 12px; }
+  .rail a.sel { border-left: 0; }
+  main { padding: 24px; }
+  .filters, .card { border-radius: 10px; box-shadow: 0 2px 14px #163b2710; }
+  .filters { padding: 12px 16px; margin-bottom: 16px; }
+  .grid { gap: 16px; }
+  .card > h2 { font-size: 12px; letter-spacing: .06em; padding: 13px 16px; }
+  .body { padding: 16px; }
+  select, button.btn { border-radius: 7px; }
+  .plot { border-radius: 7px; }
+  #tab-boot #clearnext, #tab-boot #reboot, #tab-boot #boot table th:last-child,
+  #tab-boot #boot table td:last-child { display: none; }
+  @media (max-width: 760px) {
+    .topbar { height: 52px; padding-inline: 12px; }
+    .tabstrip { top: 52px; }
+    main { padding: 12px; }
+  }
+</style>
+<link rel="stylesheet" href="/hardware/assets/sensor-diagram.css?v=20261104-7">
+<link rel="stylesheet" href="/hardware/assets/runtime.css?v=20261104-7">
+<script src="/hardware/assets/runtime.js?v=20261105-2" defer></script>
+<link rel="stylesheet" href="/hardware/assets/storage.css?v=20261105-7">
+<script src="/hardware/assets/storage-breakdown.js?v=20261105-4"></script>
+<script src="/hardware/assets/storage-index.js?v=20261105-7"></script>
+<script src="/hardware/assets/storage-groups.js?v=20261105-7"></script>
+<script src="/hardware/assets/storage.js?v=20261105-7"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="iconbtn" id="navbtn" aria-label="Menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
+  <span class="brand">NeoCharge <span class="brand-divider">/</span> Hardware</span>
+  <span class="host" id="hostline">neo-mac-pro</span>
+  <span class="spacer"></span>
+  <span class="st off" id="hdrstate"><i></i><span>connecting</span></span>
+</div>
+
+<div class="tabstrip" id="tabstrip" role="tablist"></div>
+
+<div class="shell">
+  <nav class="rail" id="rail">
+    <div class="grp">Monitoring</div>
+    <a data-tab="overview" class="sel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+    <a data-tab="power"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Power zones</a>
+    <a data-tab="thermal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13V5a2 2 0 1 1 4 0v8a4 4 0 1 1-4 0z"/></svg>Thermal</a>
+    <a data-tab="sensors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v10"/><circle cx="12" cy="17" r="4"/></svg>Sensors</a>
+    <a data-tab="storage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h18M7 17h.01M11 17h.01"/></svg>Storage</a>
+    <a data-tab="errors"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Event log</a>
+    <div class="grp">System</div>
+    <a data-tab="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>Services</a>
+    <a data-tab="boot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v9"/><path d="M6.6 6.6a9 9 0 1 0 10.8 0"/></svg>Boot status</a>
+    <footer class="runtime-footer">
+      <div id="runtime-build">Loading build…</div><span id="runtime-branch"></span>
+      <span class="runtime-sample-label">Last sample</span>
+      <span id="runtime-mode">Connecting</span><time id="runtime-sample">—</time>
+    </footer>
+  </nav>
+  <div class="scrim" id="scrim"></div>
+
+  <main>
+    <div class="filters">
+      <label for="range" id="range-label">Range</label>
+      <select id="range">
+        <option value="3600">Last hour</option>
+        <option value="21600">Last 6 hours</option>
+        <option value="86400">Last 24 hours</option>
+        <option value="604800" selected>Last 7 days</option>
+        <option value="2592000">Last 30 days</option>
+        <option value="31536000">Last year</option>
+      </select>
+      <button class="btn" id="refresh">Refresh</button>
+      <label class="refresh-switch"><input type="checkbox" role="switch" id="auto" checked>Auto</label>
+      <label class="refresh-switch" id="live-control"><input type="checkbox" role="switch" id="live">Live</label>
+      <span id="refresh-cadence">Refresh every 30s</span>
+      <span class="stamp" id="status"></span>
+    </div>
+
+    <div id="tab-storage" hidden>
+      <section class="card storage-intro"><h2>Storage</h2>
+        <p class="storage-note">See what’s using each drive. Categories estimate Models, Photos, Backups and more from filenames and folders. Expand a category to see its largest contributors.</p>
+        <div id="storage-summary"></div><div id="storage-status" class="storage-note">Loading storage…</div>
+        <p class="storage-note">Binary units (GiB / TiB). Raw capacity includes partitions, filesystem metadata and unallocated space. EFI and metadata partitions are hidden; raw capacity includes them. Unreadable partitions show unknown usage. The metadata index reconciles about every 30 minutes; cached categories remain visible during updates. Space totals refresh separately. Storage shows the latest snapshot.</p>
+      </section><div id="storage-drives"></div>
+    </div>
+    <!-- Dashboard -->
+    <div id="tab-overview" class="grid">
+      <section class="card wide">
+        <h2>System status</h2>
+        <div class="body"><div class="tw" id="summary"><div class="empty">loading</div></div></div>
+      </section>
+      <section class="card" data-chart="system">
+        <h2>System power<span class="tail"><button data-view="system">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">Total draw against the DC and PSU-input ceilings.</div>
+          <div class="plot"><canvas id="c-system"></canvas><div class="tip" id="t-system"></div></div>
+          <div class="legend" id="l-system"></div>
+          <div class="tw" id="d-system" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="gpupower">
+        <h2>GPU board power<span class="tail"><button data-view="gpupower">Table</button></span></h2>
+        <div class="body">
+          <div class="plot"><canvas id="c-gpupower"></canvas><div class="tip" id="t-gpupower"></div></div>
+          <div class="legend" id="l-gpupower"></div>
+          <div class="tw" id="d-gpupower" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="temps">
+        <h2>Temperatures<span class="tail"><button data-view="temps">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">GPU dies and the CPU package. Same unit, so one axis.</div>
+          <div class="plot"><canvas id="c-temps"></canvas><div class="tip" id="t-temps"></div></div>
+          <div class="legend" id="l-temps"></div>
+          <div class="tw" id="d-temps" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="fans">
+        <h2>Cooling<span class="tail"><button data-view="fans">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">Every fan as a percentage of its own ceiling, so chassis RPM and card duty share one axis.</div>
+          <div class="plot"><canvas id="c-fans"></canvas><div class="tip" id="t-fans"></div></div>
+          <div class="legend" id="l-fans"></div>
+          <div class="tw" id="d-fans" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="load">
+        <h2>Compute load<span class="tail"><button data-view="load">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">CPU busy, GPU core utilisation, and host memory in use.</div>
+          <div class="plot"><canvas id="c-load"></canvas><div class="tip" id="t-load"></div></div>
+          <div class="legend" id="l-load"></div>
+          <div class="tw" id="d-load" hidden></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Power zones -->
+    <div id="tab-power" class="grid" hidden>
+      <section class="card wide">
+        <h2>Zone headroom</h2>
+        <div class="body">
+          <div class="sub">Each rail's gauge against its SMC ceiling. Over the ceiling trips <code>PZ*T</code> and raises <code>GTHR</code>.</div>
+          <div class="tw" id="headroom"><div class="empty">loading</div></div>
+        </div>
+      </section>
+      <section class="card wide" data-chart="energy">
+        <h2>Energy consumed<span class="tail"><button data-view="energy">Table</button></span></h2>
+        <div class="body">
+          <div class="sub" id="energysub">Watt-hours per division, integrated from total system power.</div>
+          <div class="plot"><canvas id="c-energy"></canvas><div class="tip" id="t-energy"></div></div>
+          <div class="legend" id="l-energy"></div>
+          <div class="tw" id="d-energy" hidden></div>
+        </div>
+      </section>
+      <section class="card wide" data-chart="zones">
+        <h2>GPU rail history<span class="tail"><button data-view="zones">Table</button></span></h2>
+        <div class="body">
+          <div class="plot"><canvas id="c-zones"></canvas><div class="tip" id="t-zones"></div></div>
+          <div class="legend" id="l-zones"></div>
+          <div class="tw" id="d-zones" hidden></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Thermal -->
+    <div id="tab-thermal" class="grid" hidden>
+      <section class="card" data-chart="cputemp">
+        <h2>CPU &amp; board<span class="tail"><button data-view="cputemp">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">Package temperature from <code>coretemp</code>, plus the PCH and chassis ambient.</div>
+          <div class="plot"><canvas id="c-cputemp"></canvas><div class="tip" id="t-cputemp"></div></div>
+          <div class="legend" id="l-cputemp"></div>
+          <div class="tw" id="d-cputemp" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="psutemp">
+        <h2>PSU<span class="tail"><button data-view="psutemp">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">The SMC's nine <code>Tp*</code> channels.</div>
+          <div class="plot"><canvas id="c-psutemp"></canvas><div class="tip" id="t-psutemp"></div></div>
+          <div class="legend" id="l-psutemp"></div>
+          <div class="tw" id="d-psutemp" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="storage">
+        <h2>NVMe drives<span class="tail"><button data-view="storage">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">Composite temperature reported by each drive's own controller.</div>
+          <div class="plot"><canvas id="c-storage"></canvas><div class="tip" id="t-storage"></div></div>
+          <div class="legend" id="l-storage"></div>
+          <div class="tw" id="d-storage" hidden></div>
+        </div>
+      </section>
+      <section class="card" data-chart="net">
+        <h2>Network &amp; display<span class="tail"><button data-view="net">Table</button></span></h2>
+        <div class="body">
+          <div class="sub">10 GbE PHY/MAC dies and the RX 460 driving the console.</div>
+          <div class="plot"><canvas id="c-net"></canvas><div class="tip" id="t-net"></div></div>
+          <div class="legend" id="l-net"></div>
+          <div class="tw" id="d-net" hidden></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Sensors -->
+    <div id="tab-sensors" class="grid" hidden>
+      <section class="card wide sensor-diagram" aria-labelledby="diagram-gpu-title">
+        <div class="body">
+          <div class="diagram-head">
+            <div><h2 id="diagram-gpu-title">GPU &amp; CPU side</h2><p>Three RTX A6000s, processor temperature and front intake cooling.</p></div>
+            <div class="diagram-actions"><span class="diagram-live" role="status">Connecting</span><a href="/hardware/assets/gpu-library/" class="diagram-library-link">GPU models ↗</a></div>
+          </div>
+          <div class="diagram-frame" id="sensor-diagram-frame">
+            <img class="diagram-photo" src="/hardware/assets/macpro-gpu-approved.png" alt="GPU side of the Mac Pro with three spaced RTX A6000 cards and hidden mounting tabs">
+            <svg class="diagram-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M57 50 H70 L76 33"/><circle cx="57" cy="50" r=".5"/>
+              <path d="M57 61.5 H70 L76 58"/><circle cx="57" cy="61.5" r=".5"/>
+              <path d="M57 73 H70 L76 83"/><circle cx="57" cy="73" r=".5"/>
+              <path d="M43 29 H30 L24 21"/><circle cx="43" cy="29" r=".5"/>
+              <path class="far-side" d="M33 52 L29 55 H24 M33 72 H29 V55"/><circle cx="33" cy="52" r=".5"/><circle cx="33" cy="72" r=".5"/>
+            </svg>
+            <div class="diagram-callout right gpu-top">
+              <span class="map-title">GPU 2 · RTX A6000</span>
+              <strong class="map-main" data-diagram-sensor="gpu/gpu2_temp_c" data-unit="°C">—</strong>
+              <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu2_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu2_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu2_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu2_util_gpu_pct" max="100" value="0" aria-label="GPU 2 utilization"></progress>
+            </div>
+            <div class="diagram-callout right gpu-middle">
+              <span class="map-title">GPU 0 · RTX A6000</span>
+              <strong class="map-main" data-diagram-sensor="gpu/gpu0_temp_c" data-unit="°C">—</strong>
+              <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu0_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu0_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu0_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu0_util_gpu_pct" max="100" value="0" aria-label="GPU 0 utilization"></progress>
+            </div>
+            <div class="diagram-callout right gpu-bottom">
+              <span class="map-title">GPU 1 · RTX A6000</span>
+              <strong class="map-main" data-diagram-sensor="gpu/gpu1_temp_c" data-unit="°C">—</strong>
+              <span class="map-sub"><span>Blower <b data-diagram-sensor="gpu/gpu1_fan_pct" data-unit="%">—</b></span><span>Board <b data-diagram-sensor="gpu/gpu1_power_w" data-unit="W">—</b></span></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="gpu/gpu1_util_gpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="gpu/gpu1_util_gpu_pct" max="100" value="0" aria-label="GPU 1 utilization"></progress>
+            </div>
+            <div class="diagram-callout left cpu">
+              <span class="map-title">CPU package</span>
+              <strong class="map-main" data-diagram-sensor="hwmon/coretemp_package_id_0" data-unit="°C">—</strong>
+              <span class="map-sub"><span>CPU fan 4</span><b data-diagram-sensor="fan/fan4_rpm" data-unit="RPM">—</b></span>
+              <span class="map-load-label"><span>Compute load</span><b data-diagram-sensor="host/cpu_pct" data-unit="%">—</b></span><progress class="map-load" data-diagram-load="host/cpu_pct" max="100" value="0" aria-label="CPU utilization"></progress>
+            </div>
+            <div class="diagram-callout left intake">
+              <span class="map-title">GPU bay intake</span>
+              <span class="map-sub"><span>Fan 2</span><b data-diagram-sensor="fan/fan2_rpm" data-unit="RPM">—</b></span>
+              <span class="map-sub"><span>Fan 3</span><b data-diagram-sensor="fan/fan3_rpm" data-unit="RPM">—</b></span>
+              <span class="map-detail">Shared GPU cooling zone</span>
+            </div>
+            <div class="diagram-callout left psu-summary">
+              <span class="map-title">Power supply · total load</span>
+              <strong class="map-main" data-diagram-sensor="smc_power/PSTR" data-unit="W">—</strong>
+              <span class="map-sub"><span>Hottest PSU probe</span><b data-psu-temperature>—</b></span>
+            </div>
+          </div>
+          <div class="diagram-foot"><span><strong>Sensor telemetry</strong> · follows the refresh controls</span><span>Positions are approximate · fans 2 and 3 share the GPU bay</span></div>
+        </div>
+      </section>
+      <section class="card wide sensor-diagram" aria-labelledby="diagram-reverse-title">
+        <div class="body">
+          <div class="diagram-head">
+            <div><h2 id="diagram-reverse-title">Memory &amp; PSU side</h2><p>System memory usage, pressure and power-supply cooling.</p></div>
+            <span class="diagram-live" role="status">Connecting</span>
+          </div>
+          <div class="diagram-frame" id="sensor-diagram-reverse">
+            <img class="diagram-photo" src="/hardware/assets/macpro-memory-cutout.png" alt="Reverse side of the Mac Pro with memory banks and the PSU blower">
+            <svg class="diagram-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M60 25 H70 V35 H76 M60 45 H70 V35"/><circle cx="60" cy="25" r=".5"/><circle cx="60" cy="45" r=".5"/>
+              <path d="M42 73 H29 L24 73"/><circle cx="42" cy="73" r=".5"/>
+            </svg>
+            <div class="diagram-callout right system-memory">
+              <span class="map-title">System memory</span>
+              <strong class="map-main" data-memory-field="used_bytes">—</strong>
+              <span class="map-detail">used of <b data-memory-field="total_bytes">—</b> total</span>
+              <span class="map-load-label"><span>In use</span><b data-memory-field="used_pct">—</b></span>
+              <progress class="map-load" id="diagram-memory-load" max="100" value="0" aria-label="System memory utilization"></progress>
+              <span class="map-sub"><span>Free</span><b data-memory-field="free_bytes">—</b></span>
+              <span class="map-sub" title="RAM available to applications, including reclaimable caches"><span>Available</span><b data-memory-field="available_bytes">—</b></span>
+              <span class="map-sub"><span>Cached</span><b data-memory-field="cache_bytes">—</b></span>
+              <span class="map-sub"><span>Swap used</span><b data-memory-field="swap_used_bytes">—</b></span>
+              <span class="map-sub" title="Linux PSI: percent of the last 10 seconds with at least one task stalled waiting for memory"><span>Pressure · 10s</span><b data-memory-field="pressure_some_avg10">—</b></span>
+              <span class="map-detail" id="diagram-memory-status">Reading host memory…</span>
+            </div>
+            <div class="diagram-callout left psu-blower">
+              <span class="map-title">PSU blower · fan 1</span>
+              <strong class="map-main" data-diagram-sensor="fan/fan1_rpm" data-unit="RPM">—</strong>
+              <span class="map-sub"><span>Target</span><b data-diagram-sensor="fan/fan1_target_rpm" data-unit="RPM">—</b></span>
+              <span class="map-sub"><span>PSU temperature</span><b data-psu-temperature>—</b></span>
+            </div>
+          </div>
+          <div class="diagram-foot"><span><strong>Host memory</strong> · used excludes reclaimable memory</span><span>Pressure is memory stall time · positions are approximate</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Event log -->
+    <div id="tab-errors" class="grid" hidden>
+      <section class="card wide">
+        <h2>Event log</h2>
+        <div class="body">
+          <div class="sub">
+            Discrete channels are stored with a zero deadband, so every transition is captured even
+            between samples. <code>PZ*T</code> = a power zone over budget · <code>GTHR</code> = SMC
+            GPU throttle · <code>MSCO</code> = chassis cover removed. Ubuntu warnings/errors, boot history and available UPS events are included. An unexpected restart is not proof of a power outage.
+          </div>
+          <label>Event source <select id="event-source"><option value="all">All sources</option><option value="hardware">Hardware transitions</option><option value="ubuntu">Ubuntu warnings / errors</option><option value="boot">Boots / shutdowns</option><option value="power">UPS / power events</option></select></label><p class="sub" id="event-status" role="status"></p><div class="tw" id="events"><div class="empty">loading</div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Services -->
+    <div id="tab-services" class="grid" hidden>
+      <section class="card">
+        <h2>systemd units</h2>
+        <div class="body"><div class="tw" id="units"><div class="empty">loading</div></div></div>
+      </section>
+      <section class="card">
+        <h2>Endpoint probes</h2>
+        <div class="body">
+          <div class="sub">For servers that do not run under systemd.</div>
+          <div class="tw" id="probes"><div class="empty">loading</div></div>
+        </div>
+      </section>
+      <section class="card wide">
+        <h2>GPU claims</h2>
+        <div class="body">
+          <div class="sub">Processes currently holding VRAM.</div>
+          <div class="tw" id="claims"><div class="empty">loading</div></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Power & Boot -->
+    <div id="tab-boot" class="grid" hidden>
+      <section class="card wide">
+        <h2>Session identity</h2>
+        <div class="body"><div class="tw" id="whoami"><div class="empty">loading</div></div></div>
+      </section>
+      <section class="card wide">
+        <h2>Boot device</h2>
+        <div class="body">
+          <div class="note">
+            This dashboard shows boot status. To change the next boot device, open the
+            <a href="http://neo-mac-pro.west-scoville.ts.net:9977/" target="_blank" rel="noopener noreferrer">neofand control console</a>.
+          </div>
+          <div class="tw" id="boot"><div class="empty">loading</div></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="clearnext" disabled>Clear BootNext</button>
+            <span class="dim" id="bootmsg"></span>
+          </div>
+        </div>
+      </section>
+      <section class="card wide">
+        <h2>Power control</h2>
+        <div class="body">
+          <div class="sub">Power controls are available in the neofand control console.</div>
+          <div class="row">
+            <button class="btn danger" id="reboot" disabled>Reboot system</button>
+            <span class="dim" id="rebootmsg"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/hardware/assets/sensor-diagram.js?v=20261104-7"></script>
+<script>
+"use strict";
+
+/* Categorical slots in fixed order -- assigned by position, never cycled and
+   never reassigned when a series count changes, so a colour always means the
+   same channel. Values come from CSS custom properties so light/dark swap in
+   one place. */
+const SLOTS = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const slot = (i) => css(SLOTS[i % SLOTS.length]);
+
+const $ = (id) => document.getElementById(id);
+const state = { metrics: [], latest: [], timer: null, tab: "overview", whoami: null, charts: {} };
+const PAGE_RANGES={overview:604800,power:604800,thermal:21600,errors:2592000};
+state.ranges={...PAGE_RANGES};
+const rangeSecs = () => parseInt($("range").value, 10);
+const fmtTime = (t) => new Date(t * 1000).toLocaleString();
+const fmtClock = (t) => {
+  const d = new Date(t * 1000);
+  return rangeSecs() > 172800
+    ? `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
+    : d.toLocaleTimeString();
+};
+
+/* Every label that reaches the DOM is treated as untrusted: SMC key names and
+   process names come from hardware and /proc, not from this file. */
+function txt(s) { return document.createTextNode(String(s)); }
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = String(text);
+  return e;
+}
+function table(headers, rows) {
+  const t = el("table"), thead = el("thead"), tr = el("tr");
+  headers.forEach(h => {
+    const th = el("th", h.num ? "num" : null);
+    th.textContent = h.label ?? h;
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr); t.appendChild(thead);
+  const tb = el("tbody");
+  rows.forEach(cells => {
+    const r = el("tr");
+    cells.forEach(c => {
+      const td = el("td", c && c.cls ? c.cls : null);
+      if (c && c.node) td.appendChild(c.node);
+      else td.textContent = c && c.text !== undefined ? c.text : (c ?? "");
+      r.appendChild(td);
+    });
+    tb.appendChild(r);
+  });
+  t.appendChild(tb);
+  return t;
+}
+function statusEl(kind, word) {
+  const s = el("span", "st " + kind);
+  s.appendChild(el("i"));
+  s.appendChild(el("span", null, word));
+  return s;
+}
+function put(host, node) { host.replaceChildren(node); }
+function putEmpty(host, msg) { put(host, el("div", "empty", msg)); }
+
+async function getJSON(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    let m = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j.error) m = j.error; } catch (e) {}
+    throw new Error(m);
+  }
+  return r.json();
+}
+/* Bucket width for the current range. Kept as its own function because
+   gapThreshold() has to agree with what was actually requested -- the server
+   only widens `step` past this when (to-from)/step would exceed MAX_POINTS, and
+   this formula fixes that ratio at 800, so it never does. */
+const stepSecs = () => Math.max(10, Math.floor(rangeSecs() / 800));
+
+async function series(sub, names) {
+  if (!names.length) return { series: [] };
+  const to = Math.floor(Date.now() / 1000), from = to - rangeSecs();
+  return getJSON(`/hardware/api/series?subsystem=${encodeURIComponent(sub)}&name=${names.map(encodeURIComponent).join(",")}&from=${from}&to=${to}&step=${stepSecs()}`);
+}
+
+/* ------------------------------------------------------------------ *
+ * Outage gaps.
+ *
+ * A missing bucket does NOT mean "no data". The store is deadbanded: a row is
+ * written only when a value moves past its threshold, or every heartbeat_secs
+ * so a flat channel still leaves a trace. "Unchanged since the last row" is the
+ * literal meaning of a gap, which is why averageGroups() holds values forward
+ * and why api_energy() integrates them as a step.
+ *
+ * So the bar for calling a stretch an outage has to sit above the heartbeat,
+ * not above `step`. 600 s is twice the default heartbeat, matching api_energy's
+ * DT_CAP -- the same judgement, made in the same units, for the same reason.
+ * (Both are hardcoded to the *default* heartbeat_secs=300. Raising that in the
+ * config past 300 without changing these two constants would make flat channels
+ * read as outages.)
+ *
+ * The floor also has to scale with the bucket: on a month view `step` is ~54 min,
+ * so consecutive buckets are legitimately further apart than 600 s and a fixed
+ * threshold would flag the entire chart as missing. Past 1.5 buckets of silence
+ * a bucket genuinely produced no rows.
+ * ------------------------------------------------------------------ */
+const GAP_MIN_SECS = 600;
+const gapThreshold = () => Math.max(GAP_MIN_SECS, stepSecs() * 1.5);
+
+/* Insert explicit zeros across outages so a dead stretch reads as zero rather
+ * than as a straight line interpolated between the readings either side of it.
+ *
+ * The zeros are placed one bucket inside the gap at each end, so the line drops
+ * vertically at the moment logging stopped and climbs back when it resumed,
+ * instead of sloping across the whole outage.
+ *
+ * A point from /hardware/api/series is [ts, avg, low, high] -- four elements, because the
+ * bucket carries its own min and max. So the synthetic marker goes at index 4,
+ * NOT index 2: a marker at 2 collides with `low`, which is non-zero for a real
+ * reading and therefore flags every real point as synthetic. Synthetic points
+ * keep the full four-element shape so a point is one shape everywhere.
+ *
+ * render() draws them -- that is the whole point -- but dataTable() filters them
+ * back out, because a fabricated 0 must never be reported as an observed Min or
+ * counted as a real sample. Every other consumer reads p[0]/p[1] only. */
+const SYNTHETIC = 4;
+const isSynthetic = (p) => !!p[SYNTHETIC];
+
+function zeroFillGaps(dataset) {
+  const limit = gapThreshold(), step = stepSecs();
+  return dataset.map(s => {
+    if (!s || !s.points || s.points.length < 2) return s;
+    const points = [];
+    s.points.forEach((p, i) => {
+      const prev = s.points[i - 1];
+      if (prev && p[0] - prev[0] > limit) {
+        // Clamp inward so a gap barely over the threshold cannot emit zeros
+        // out of order, or past the live reading on the far side.
+        const a = Math.min(prev[0] + step, p[0] - 1);
+        const b = Math.max(p[0] - step, a);
+        points.push([a, 0, 0, 0, true], [b, 0, 0, 0, true]);
+      }
+      points.push(p);
+    });
+    return { ...s, points };
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Chart. Hand-written so the page stays self-contained -- a strict CSP
+ * and an offline BMC-style console both rule out a CDN chart library.
+ * ------------------------------------------------------------------ */
+function render(key, dataset, opts = {}) {
+  const canvas = $("c-" + key);
+  if (!canvas) return;
+  // Store before the width check. A canvas inside a hidden card measures zero,
+  // and returning without recording the data is what left charts permanently
+  // blank after toggling to the table view and back.
+  state.charts[key] = { dataset, opts, ok: false, bars: false };
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = "11px ui-sans-serif, system-ui, sans-serif";
+
+  const pts = dataset.flatMap(s => s.points);
+  const pad = { l: 50, r: 12, t: 10, b: 22 };
+  const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  if (!pts.length) {
+    g.fillStyle = css("--muted");
+    g.fillText("No data in this range", pad.l, pad.t + ph / 2);
+    return;
+  }
+
+  let x0 = Math.min(...pts.map(p => p[0])), x1 = Math.max(...pts.map(p => p[0]));
+  let y0 = Math.min(...pts.map(p => p[1])), y1 = Math.max(...pts.map(p => p[1]));
+  (opts.refs || []).forEach(r => { y0 = Math.min(y0, r.value); y1 = Math.max(y1, r.value); });
+  if (opts.zeroBase) y0 = Math.min(y0, 0);
+  if (x1 === x0) x1 = x0 + 1;
+  if (y1 === y0) { y1 = y0 + 1; y0 -= 1; }
+  const m = (y1 - y0) * 0.08; y0 -= m; y1 += m;
+  /* Watts, RPM, percent and kelvin-backed temperatures are all non-negative.
+     The 8% headroom above can push the floor below zero on a low, flat series,
+     which draws gridlines at values the hardware cannot report. Clamp the floor
+     whenever the data itself never goes negative. */
+  if (Math.min(...pts.map(p => p[1]), ...(opts.refs || []).map(r => r.value)) >= 0) {
+    y0 = Math.max(0, y0);
+  }
+  // A percentage axis running to 108% is just wrong.
+  if (opts.maxY !== undefined) y1 = Math.min(y1, opts.maxY);
+  const X = t => pad.l + (t - x0) / (x1 - x0) * pw;
+  const Y = v => pad.t + ph - (v - y0) / (y1 - y0) * ph;
+
+  /* Recessive chrome: grid and axis sit behind the data, never compete. */
+  g.strokeStyle = css("--grid"); g.lineWidth = 1;
+  g.fillStyle = css("--muted");
+  for (let i = 0; i <= 4; i++) {
+    const v = y0 + (y1 - y0) * i / 4, y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke();
+    g.fillText(v.toFixed(Math.abs(v) < 10 ? 1 : 0), 6, y + 3);
+  }
+  g.strokeStyle = css("--axis");
+  g.beginPath(); g.moveTo(pad.l + 0.5, pad.t); g.lineTo(pad.l + 0.5, pad.t + ph); g.stroke();
+  const ticks = w < 420 ? 2 : 3;
+  for (let i = 0; i <= ticks; i++) {
+    const t = x0 + (x1 - x0) * i / ticks;
+    const label = fmtClock(t).replace(/:\d\d$/, "");
+    const tw = g.measureText(label).width;
+    g.fillText(label, Math.min(Math.max(X(t) - tw / 2, 2), w - tw - 2), h - 6);
+  }
+
+  (opts.refs || []).forEach(r => {
+    g.strokeStyle = r.color || css("--critical");
+    g.setLineDash([5, 4]); g.lineWidth = 1.25;
+    const y = Math.round(Y(r.value)) + 0.5;
+    g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = r.color || css("--critical");
+    const tw = g.measureText(r.label).width;
+    g.fillText(r.label, w - pad.r - tw - 2, Math.max(y - 4, pad.t + 9));
+  });
+
+  dataset.forEach((s, i) => {
+    if (!s.points.length) return;
+    g.strokeStyle = s.color || slot(i);
+    g.lineWidth = 2; g.lineJoin = "round"; g.lineCap = "round";
+    g.beginPath();
+    s.points.forEach((p, j) => { const x = X(p[0]), y = Y(p[1]); j ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+  });
+
+  Object.assign(state.charts[key], { ok: true, X, Y, x0, x1, pad, pw, ph, w, h });
+}
+
+function legend(key, dataset) {
+  const host = $("l-" + key);
+  host.replaceChildren();
+  if (dataset.length < 2) return;          // one series: the card title names it
+  dataset.forEach((s, i) => {
+    const span = el("span");
+    const k = el("i", "k");
+    k.style.background = s.color || slot(i);
+    span.appendChild(k);
+    span.appendChild(txt(s.name));
+    host.appendChild(span);
+  });
+}
+
+/* Crosshair + one tooltip listing every series at that X. */
+function wireHover(key) {
+  const canvas = $("c-" + key), tip = $("t-" + key);
+  if (!canvas || canvas.dataset.wired) return;
+  canvas.dataset.wired = "1";
+
+  const hide = () => { tip.style.display = "none"; redraw(key); };
+
+  const move = (ev) => {
+    const c = state.charts[key];
+    if (!c || !c.ok) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+
+    if (c.bars) {
+      const hit = c.rects.find(r => px >= r.x - 1 && px <= r.x + r.w + 1);
+      if (!hit) { hide(); return; }
+      redraw(key);
+      const g2 = canvas.getContext("2d");
+      g2.strokeStyle = css("--ink"); g2.lineWidth = 1.5;
+      g2.strokeRect(hit.x - 0.5, hit.y - 0.5, hit.w + 1, hit.h + 1);
+      tip.replaceChildren();
+      tip.appendChild(el("div", "when", fmtTime(hit.b.ts)));
+      const row = el("div", "r");
+      const k = el("i", "k"); k.style.background = slot(0);
+      row.appendChild(k);
+      row.appendChild(el("b", null, hit.b.wh.toFixed(1) + " Wh"));
+      tip.appendChild(row);
+      const r2 = el("div", "r");
+      r2.appendChild(el("span", null, `mean ${hit.b.avg_w.toFixed(0)} W · peak ${hit.b.peak_w.toFixed(0)} W`));
+      tip.appendChild(r2);
+      tip.style.display = "block";
+      tip.style.left = Math.min(Math.max(px + 14, 4), canvas.clientWidth - tip.offsetWidth - 4) + "px";
+      tip.style.top = "8px";
+      return;
+    }
+
+    if (px < c.pad.l || px > c.w - c.pad.r) { hide(); return; }
+    const t = c.x0 + (px - c.pad.l) / c.pw * (c.x1 - c.x0);
+
+    const rows = [];
+    let snapT = null;
+    c.dataset.forEach((s, i) => {
+      if (!s.points.length) return;
+      let best = s.points[0], bd = Infinity;
+      for (const p of s.points) { const d = Math.abs(p[0] - t); if (d < bd) { bd = d; best = p; } }
+      if (snapT === null) snapT = best[0];
+      rows.push({ name: s.name, value: best[1], color: s.color || slot(i) });
+    });
+    if (!rows.length) return;
+
+    render(key, c.dataset, c.opts);
+    const g = canvas.getContext("2d");
+    const x = Math.round(c.X(snapT)) + 0.5;
+    g.strokeStyle = css("--axis"); g.lineWidth = 1; g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(x, c.pad.t); g.lineTo(x, c.pad.t + c.ph); g.stroke();
+    g.setLineDash([]);
+    rows.forEach(r => {
+      g.fillStyle = r.color;
+      g.beginPath(); g.arc(x, c.Y(r.value), 3.5, 0, 6.284); g.fill();
+      g.strokeStyle = css("--surface-1"); g.lineWidth = 2; g.stroke();   // 2px surface ring
+    });
+
+    tip.replaceChildren();
+    tip.appendChild(el("div", "when", fmtClock(snapT)));
+    rows.forEach(r => {
+      const row = el("div", "r");
+      const k = el("i", "k"); k.style.background = r.color;
+      row.appendChild(k);
+      row.appendChild(el("b", null, r.value.toFixed(1)));   // value leads
+      row.appendChild(el("span", null, r.name));            // label follows
+      tip.appendChild(row);
+    });
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(px + 14, 4), canvas.clientWidth - tw - 4) + "px";
+    tip.style.top = "8px";
+  };
+
+  canvas.addEventListener("pointermove", move);
+  canvas.addEventListener("pointerdown", move);
+  canvas.addEventListener("pointerleave", hide);
+  canvas.addEventListener("blur", hide);
+}
+
+/* Table view -- the accessibility path that never depends on hover. */
+function dataTable(key, dataset) {
+  const host = $("d-" + key);
+  if (!host) return;
+  if (!dataset.length) { putEmpty(host, "No data in this range"); return; }
+  put(host, table(
+    ["Series", { label: "Latest", num: true }, { label: "Min", num: true }, { label: "Max", num: true }, { label: "Points", num: true }],
+    dataset.map(s => {
+      // Observed rows only. The zeros zeroFillGaps() adds are a drawing device;
+      // counting them would report a Min of 0 for a channel that never read 0.
+      const vals = s.points.filter(p => !isSynthetic(p)).map(p => p[1]);
+      return [
+        s.name,
+        { text: vals.length ? vals[vals.length - 1].toFixed(1) : "–", cls: "num" },
+        { text: vals.length ? Math.min(...vals).toFixed(1) : "–", cls: "num" },
+        { text: vals.length ? Math.max(...vals).toFixed(1) : "–", cls: "num" },
+        { text: String(vals.length), cls: "num" }
+      ];
+    })
+  ));
+}
+
+/* Fan grouping.
+ *
+ * Four chassis fans plotted individually is four near-identical lines that move
+ * together, which reads as noise rather than signal. Averaging by role gives one
+ * line per thermal zone.
+ *
+ * Roles follow the physical stall test recorded in MACPRO71-FINDINGS.md: fan1 is
+ * the PSU, fan4 is the CPU cooler, and fan2/fan3 are both MPX-bay fans that have
+ * never been told apart individually -- which is exactly why averaging them is
+ * safe and plotting them separately is not informative.
+ *
+ * The A6000 blowers are deliberately NOT in this group set: they report percent
+ * duty, not RPM. Putting them on this chart would need a second y-scale, and a
+ * dual-axis chart invites false correlation between two unrelated units. They
+ * get their own card instead. */
+const FAN_GROUPS = [
+  { name: "PSU", members: ["fan1_rpm"] },
+  { name: "MPX", members: ["fan2_rpm", "fan3_rpm"] },
+  { name: "CPU", members: ["fan4_rpm"] }
+];
+
+/* Average member series into one line per group.
+ *
+ * The deadband means members do not share a timestamp set -- a fan that has not
+ * moved has no row for that bucket. Averaging only the buckets where every
+ * member happens to have written would drop most of the series, so each member
+ * carries its last known value forward to every bucket in the union. */
+function averageGroups(dataset, groups) {
+  const byName = new Map(dataset.map(s => [s.name, s]));
+  const allTs = [...new Set(dataset.flatMap(s => s.points.map(p => p[0])))].sort((a, b) => a - b);
+  return groups.map(g => {
+    const members = g.members.map(n => byName.get(n)).filter(Boolean);
+    if (!members.length) return null;
+    const cursor = members.map(() => 0);
+    const held = members.map(() => null);
+    const points = [];
+    for (const ts of allTs) {
+      let sum = 0, n = 0;
+      members.forEach((m, i) => {
+        while (cursor[i] < m.points.length && m.points[cursor[i]][0] <= ts) {
+          held[i] = m.points[cursor[i]][1];
+          cursor[i]++;
+        }
+        if (held[i] !== null) { sum += held[i]; n++; }
+      });
+      if (n) points.push([ts, sum / n]);
+    }
+    return { name: g.name, points };
+  }).filter(Boolean);
+}
+
+
+/* Bar chart, for energy per division.
+ *
+ * Bars rather than a line because each value is a *total over an interval*, not
+ * a reading at an instant -- a line between two totals implies intermediate
+ * values that were never measured. Per the mark spec: rounded data-ends anchored
+ * to the baseline, a 2px surface gap between bars, and the mark itself is the
+ * hit target (no crosshair -- there is no continuous X to snap to). */
+function renderBars(key, buckets, opts = {}) {
+  const canvas = $("c-" + key);
+  if (!canvas) return;
+  state.charts[key] = { dataset: buckets, opts, ok: false, bars: true };
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = "11px ui-sans-serif, system-ui, sans-serif";
+
+  const pad = { l: 52, r: 12, t: 10, b: 22 };
+  const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  if (!buckets.length) {
+    g.fillStyle = css("--muted");
+    g.fillText("No data in this range", pad.l, pad.t + ph / 2);
+    return;
+  }
+
+  const y1 = Math.max(...buckets.map(b => b.wh)) * 1.1 || 1;
+  const Y = v => pad.t + ph - v / y1 * ph;
+
+  g.strokeStyle = css("--grid"); g.fillStyle = css("--muted"); g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const v = y1 * i / 4, y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(pad.l, y); g.lineTo(w - pad.r, y); g.stroke();
+    g.fillText(v >= 100 ? v.toFixed(0) : v.toFixed(1), 6, y + 3);
+  }
+
+  const slotW = pw / buckets.length;
+  const barW = Math.max(1, slotW - 2);          // 2px surface gap between bars
+  const r = Math.min(4, barW / 2);              // 4px rounded data-end
+  const rects = [];
+  buckets.forEach((b, i) => {
+    const x = pad.l + i * slotW + (slotW - barW) / 2;
+    const y = Y(b.wh), hh = Math.max(1, pad.t + ph - y);
+    rects.push({ x, y, w: barW, h: hh, b });
+    g.fillStyle = slot(0);
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, barW, hh, [r, r, 0, 0]);
+    else g.rect(x, y, barW, hh);
+    g.fill();
+  });
+
+  const every = Math.max(1, Math.round(buckets.length / (w < 500 ? 3 : 6)));
+  g.fillStyle = css("--muted");
+  buckets.forEach((b, i) => {
+    if (i % every) return;
+    const label = bucketLabel(b.ts, opts.bucket);
+    const tw = g.measureText(label).width;
+    g.fillText(label, Math.min(Math.max(pad.l + i * slotW + slotW / 2 - tw / 2, 2), w - tw - 2), h - 6);
+  });
+
+  Object.assign(state.charts[key], { ok: true, rects, pad, pw, ph, w, h });
+}
+
+function bucketLabel(ts, bucket) {
+  const d = new Date(ts * 1000);
+  if (bucket >= 7 * 86400) return `${d.getMonth() + 1}/${d.getDate()}`;
+  if (bucket >= 86400) return d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/* Re-render from stored state without refetching. */
+function redraw(key) {
+  const c = state.charts[key];
+  if (!c) return;
+  (c.bars ? renderBars : render)(key, c.dataset, c.opts);
+}
+
+/* Fetch several (subsystem, names) groups at once. */
+async function fetchMany(specs) {
+  const out = await Promise.all(specs.map(async sp => {
+    try { return sp.names.length ? (await series(sp.sub, sp.names)).series : []; }
+    catch (e) { return []; }
+  }));
+  return out;
+}
+
+/* Division width for the energy chart. Hourly on a day view, daily on week and
+   month, weekly beyond -- so a bar is always a unit a person actually thinks in. */
+function energyBucket() {
+  const r = rangeSecs();
+  if (r <= 6 * 3600) return 600;
+  if (r <= 26 * 3600) return 3600;
+  if (r <= 45 * 86400) return 86400;
+  return 7 * 86400;
+}
+
+async function loadEnergy() {
+  const to = Math.floor(Date.now() / 1000), from = to - rangeSecs();
+  const bucket = energyBucket();
+  let d;
+  try { d = await getJSON(`/hardware/api/energy?from=${from}&to=${to}&bucket=${bucket}`); }
+  catch (e) { renderBars("energy", [], { bucket }); return; }
+
+  renderBars("energy", d.buckets, { bucket });
+  legend("energy", []);
+  const unit = bucket >= 7 * 86400 ? "week" : bucket >= 86400 ? "day" : bucket >= 3600 ? "hour" : "10 min";
+  const kwh = d.total_wh / 1000;
+  let text = `Watt-hours per ${unit}. Total over this range: ${kwh.toFixed(2)} kWh.`;
+  if (d.cost_per_kwh > 0) text += ` Cost: ${(kwh * d.cost_per_kwh).toFixed(2)} at ${d.cost_per_kwh}/kWh.`;
+  else text += " Set cost_per_kwh in [Web] to price it.";
+  $("energysub").textContent = text;
+
+  put($("d-energy"), table(
+    ["Division", { label: "Wh", num: true }, { label: "Mean W", num: true }, { label: "Peak W", num: true }],
+    d.buckets.map(b => [
+      fmtTime(b.ts),
+      { text: b.wh.toFixed(1), cls: "num" },
+      { text: b.avg_w.toFixed(0), cls: "num" },
+      { text: b.peak_w.toFixed(0), cls: "num" }
+    ])
+  ));
+  wireHover("energy");
+}
+
+/* Cooling: chassis fans normalised to their own ceiling so RPM and the cards'
+   percent duty are the same quantity -- "how hard is this fan working" -- and can
+   share one axis without a second scale. */
+async function loadCooling() {
+  const rpmNames = namesIn("fan", /^fan\d+_rpm$/);
+  const blowers = namesIn("gpu", /_fan_pct$/);
+  const [chassis, cards] = await fetchMany([
+    { sub: "fan", names: rpmNames },
+    { sub: "gpu", names: blowers }
+  ]);
+  const asPct = chassis.map(s => {
+    const m = s.name.match(/^fan(\d+)_rpm$/);
+    const ceiling = m ? latestOf("fan", `fan${m[1]}_max_rpm`) : null;
+    return { name: s.name, points: ceiling ? s.points.map(p => [p[0], p[1] / ceiling * 100]) : [] };
+  });
+  // After averaging, not before: averageGroups() holds each member's last value
+  // forward, so a gap in its output is a stretch where no member wrote at all.
+  const ds = zeroFillGaps([
+    ...averageGroups(asPct, FAN_GROUPS),
+    ...averageGroups(cards, [{ name: "GPU cards", members: blowers }])
+  ]);
+  render("fans", ds, { zeroBase: true, maxY: 100 });
+  legend("fans", ds); dataTable("fans", ds); wireHover("fans");
+}
+
+async function loadLoad() {
+  const gpuUtil = namesIn("gpu", /_util_gpu_pct$/);
+  const [host, gpu] = await fetchMany([
+    { sub: "host", names: ["cpu_pct", "mem_used_pct"].filter(n => has("host", n)) },
+    { sub: "gpu", names: gpuUtil }
+  ]);
+  const ds = zeroFillGaps([
+    ...host.map(s => ({ name: s.name === "cpu_pct" ? "CPU" : "Memory", points: s.points })),
+    ...averageGroups(gpu, [{ name: "GPU cores", members: gpuUtil }])
+  ]);
+  render("load", ds, { zeroBase: true, maxY: 100 });
+  legend("load", ds); dataTable("load", ds); wireHover("load");
+}
+
+async function panel(key, sub, names, opts = {}) {
+  let ds = [];
+  try { ds = names.length ? (await series(sub, names)).series : []; } catch (e) { ds = []; }
+  if (opts.transform) ds = opts.transform(ds);
+  ds = zeroFillGaps(ds);
+  if (opts.colors) ds.forEach((s, i) => { s.color = opts.colors[i]; });
+  render(key, ds, opts);
+  legend(key, ds);
+  dataTable(key, ds);
+  wireHover(key);
+}
+
+const has = (s, n) => state.metrics.some(m => m.subsystem === s && m.name === n);
+const namesIn = (s, re) => state.metrics.filter(m => m.subsystem === s && re.test(m.name)).map(m => m.name);
+const latestOf = (s, n) => { const r = state.latest.find(m => m.subsystem === s && m.name === n); return r ? r.value : null; };
+
+function zones() {
+  const out = [];
+  for (let n = 0; n <= 9; n++) {
+    if (!has("smc_power", `PZ${n}G`)) continue;
+    const cap = latestOf("smc_power", `PZ${n}E`);
+    if (!cap) continue;
+    out.push({ zone: `PZ${n}`, gauge: `PZ${n}G`, cap, now: latestOf("smc_power", `PZ${n}G`), trip: latestOf("smc_power", `PZ${n}T`) });
+  }
+  return out;
+}
+function zoneState(z) {
+  if (z.trip > 0) return ["crit", "Tripped"];
+  const pct = z.now != null && z.cap ? z.now / z.cap * 100 : 0;
+  if (pct >= 100) return ["crit", "Over"];
+  if (pct >= 85) return ["warn", "High"];
+  return ["good", "Normal"];
+}
+
+function renderHeadroom() {
+  const z = zones();
+  if (!z.length) { putEmpty($("headroom"), "No zone data yet"); return; }
+  put($("headroom"), table(
+    ["Zone", { label: "Reading", num: true }, { label: "Ceiling", num: true }, { label: "Used", num: true }, "Utilisation", "State"],
+    z.map(x => {
+      const pct = x.now != null && x.cap ? x.now / x.cap * 100 : 0;
+      const [kind, word] = zoneState(x);
+      const bar = el("div", "bar");
+      const fill = el("i", kind === "crit" ? "crit" : kind === "warn" ? "warn" : null);
+      fill.style.width = Math.min(pct, 100).toFixed(0) + "%";
+      bar.appendChild(fill);
+      return [
+        x.zone,
+        { text: x.now != null ? x.now.toFixed(1) + " W" : "–", cls: "num" },
+        { text: x.cap.toFixed(0) + " W", cls: "num" },
+        { text: pct.toFixed(0) + "%", cls: "num" },
+        { node: bar },
+        { node: statusEl(kind, word) }
+      ];
+    })
+  ));
+}
+
+function renderSummary() {
+  const z = zones(), worst = z.reduce((a, b) => {
+    const pa = a && a.cap ? a.now / a.cap : -1, pb = b.cap ? b.now / b.cap : -1;
+    return pb > pa ? b : a;
+  }, null);
+  const gthr = latestOf("smc_flag", "GTHR"), cover = latestOf("smc_flag", "MSCO");
+  const pstr = latestOf("smc_power", "PSTR");
+  const gpuW = state.latest.filter(m => m.subsystem === "gpu" && /power_w$/.test(m.name))
+                           .reduce((a, m) => a + m.value, 0);
+  const hot = state.latest.filter(m => m.subsystem === "gpu" && /temp_c$/.test(m.name))
+                          .reduce((a, m) => Math.max(a, m.value), 0);
+  const rows = [
+    ["System power", { text: pstr != null ? pstr.toFixed(0) + " W" : "–", cls: "num" },
+      { node: statusEl(pstr > 1100 ? "warn" : "good", pstr > 1100 ? "High" : "Normal") }],
+    ["GPU board power", { text: gpuW ? gpuW.toFixed(0) + " W" : "–", cls: "num" },
+      { node: statusEl("good", "Normal") }],
+    ["Hottest GPU die", { text: hot ? hot.toFixed(0) + " °C" : "–", cls: "num" },
+      { node: statusEl(hot >= 85 ? "crit" : hot >= 75 ? "warn" : "good", hot >= 85 ? "Critical" : hot >= 75 ? "Warm" : "Normal") }],
+    ["Busiest rail", { text: worst && worst.cap ? `${worst.zone} ${(worst.now / worst.cap * 100).toFixed(0)}%` : "–", cls: "num" },
+      { node: worst ? statusEl(...zoneState(worst)) : statusEl("off", "Unknown") }],
+    ["SMC GPU throttle (GTHR)", { text: gthr > 0 ? "Asserted" : "Clear", cls: "num" },
+      { node: statusEl(gthr > 0 ? "warn" : "good", gthr > 0 ? "Asserted" : "Clear") }],
+    ["Chassis cover (MSCO)", { text: cover > 0 ? "Open" : "Closed", cls: "num" },
+      { node: statusEl(cover > 0 ? "warn" : "good", cover > 0 ? "Open" : "Closed") }]
+  ];
+  put($("summary"), table(["Item", { label: "Reading", num: true }, "State"], rows));
+
+  const bad = gthr > 0 || (worst && worst.trip > 0) || hot >= 85;
+  const hdr = $("hdrstate");
+  hdr.replaceChildren();
+  const s = statusEl(bad ? "warn" : "good", bad ? "Attention" : "Healthy");
+  while (s.firstChild) hdr.appendChild(s.firstChild);
+  hdr.className = s.className;
+}
+
+let eventRequest=0;
+async function loadEvents() {
+  const request=++eventRequest,seconds=rangeSecs(),from=Date.now()/1000-seconds;
+  const results=await Promise.allSettled([
+    getJSON(`/hardware/api/events?hours=${Math.max(1,Math.round(seconds/3600))}`),
+    getJSON('/hardware/api/host-events')
+  ]);
+  if(request!==eventRequest)return;
+  let events=[],notes=[];
+  if(results[0].status==='fulfilled')events.push(...(results[0].value.events||[]).map(e=>({ts:e.ts,kind:'hardware',unit:e.name,title:e.state==='asserted'?'Asserted':'Cleared',message:'Hardware state transition',severity:e.state==='asserted'?'warning':'info',confidence:'recorded'})));
+  else notes.push('Hardware transitions unavailable.');
+  if(results[1].status==='fulfilled'){
+    const d=results[1].value;events.push(...(d.events||[]));
+    if(d.status!=='ok'||!d.timestamp||Date.now()/1000-d.timestamp>180)notes.push('Ubuntu snapshot unavailable or stale; retained records are shown.');
+    else notes.push('Ubuntu sampled '+fmtTime(d.timestamp)+'.');
+    notes.push(...(d.warnings||[]));
+    if(from<d.window_start)notes.push('Ubuntu history is retained for up to 30 days.');
+    if(!d.ups_records)notes.push('No UPS records found; power outages cannot be confirmed from reboot history alone.');
+  }else notes.push('Ubuntu journal snapshot unavailable.');
+  const filter=$('event-source').value;
+  events=events.filter(e=>Number.isFinite(e.ts)&&e.ts>=from&&(filter==='all'||e.kind===filter)).sort((a,b)=>b.ts-a.ts);
+  const shown=events.slice(0,500);
+  notes.unshift(`${events.length} matching events${events.length>500?' · showing newest 500; narrow the range or source':''}.`);
+  $('event-status').textContent=notes.join(' ');
+  if(!shown.length){putEmpty($('events'),'No matching events in the available history.');return;}
+  put($('events'),table(['Time','Source / unit','Event','Details'],shown.map(e=>[
+    fmtTime(e.ts),e.unit||e.source||e.kind,
+    {node:statusEl(e.severity==='error'?'crit':e.severity==='warning'?'warn':'good',e.title+(e.confidence==='inferred'?' · inferred':''))},
+    e.message
+  ])));
+}
+$('event-source').addEventListener('change',loadEvents);
+
+async function loadServices() {
+  try {
+    const d = await getJSON("/hardware/api/services");
+    state.svc = d;
+    applyVisibility();
+    d.units.length
+      ? put($("units"), table(["Unit", "State", { label: "Restarts", num: true }, "Active since"],
+          d.units.map(u => [u.name,
+            { node: statusEl(u.active === "active" ? "good" : "crit", u.active + (u.sub ? " / " + u.sub : "")) },
+            { text: u.restarts, cls: "num" },
+            { text: u.since ? fmtTime(u.since) : "–", cls: "dim" }])))
+      : putEmpty($("units"), "None configured.");
+
+    d.probes.length
+      ? put($("probes"), table(["Name", "State", { label: "Latency", num: true }, "Endpoint"],
+          d.probes.map(p => [p.name,
+            { node: statusEl(p.ok ? "good" : "crit", p.ok ? "Up " + p.status : (p.detail || "Down")) },
+            { text: p.latency_ms + " ms", cls: "num" },
+            { text: p.url, cls: "dim" }])))
+      : putEmpty($("probes"), "None configured.");
+
+    d.gpu_claims.length
+      ? put($("claims"), table(["GPU", "PID", "Process", { label: "VRAM", num: true }],
+          d.gpu_claims.map(c => ["GPU" + c.gpu, c.pid,
+            { node: (() => { const x = el("code"); x.textContent = c.process; return x; })() },
+            { text: c.used_mib + " MiB", cls: "num" }])))
+      : putEmpty($("claims"), "No process is holding VRAM.");
+  } catch (e) { putEmpty($("units"), "Error: " + e.message); }
+}
+
+async function loadBoot() {
+  try {
+    const d = await getJSON("/hardware/api/boot");
+    const w = d.whoami; state.whoami = w;
+    const can = w.control_enabled && w.permitted;
+
+    put($("whoami"), table(["Field", "Value"], [
+      ["Peer address", w.peer],
+      ["Tailscale user", w.login || "not identified"],
+      ["Node", { text: w.node || "–", cls: "dim" }],
+      ["Control plane", { node: w.control_enabled
+        ? statusEl(w.permitted ? "good" : "crit", w.permitted ? "Permitted" : "Not permitted for this user")
+        : statusEl("off", "Disabled in configuration") }]
+    ]));
+    const kv = $("whoami").querySelector("table"); if (kv) kv.className = "kv";
+
+    put($("boot"), table(["ID", "Label", "State", ""], d.entries.map(e => {
+      const btn = el("button", "btn", "Boot next");
+      btn.disabled = !can;
+      btn.addEventListener("click", () => setBootNext(e.id));
+      const st = el("span", "row");
+      if (e.current) st.appendChild(statusEl("good", "Booted"));
+      if (e.next) st.appendChild(statusEl("warn", "Next"));
+      if (!e.current && !e.next) st.appendChild(statusEl("off", e.active ? "Available" : "Inactive"));
+      return [
+        { node: (() => { const c = el("code"); c.textContent = e.id; return c; })() },
+        e.label || "(no label)",
+        { node: st },
+        { node: btn }
+      ];
+    })));
+
+    $("reboot").disabled = !can;
+    $("clearnext").disabled = !can;
+    state.bootOk = true;
+  } catch (e) { state.bootOk = false; applyVisibility(); putEmpty($("boot"), "Error: " + e.message); }
+}
+
+const post = (url, body) => getJSON(url, {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: body || ""
+});
+async function setBootNext(id) {
+  $("bootmsg").textContent = "Setting…";
+  try { const r = await post("/hardware/api/control/bootnext", "id=" + encodeURIComponent(id)); $("bootmsg").textContent = r.message; loadBoot(); }
+  catch (e) { $("bootmsg").textContent = "Failed: " + e.message; }
+}
+$("clearnext").addEventListener("click", async () => {
+  try { const r = await post("/hardware/api/control/bootnext-clear"); $("bootmsg").textContent = r.message; loadBoot(); }
+  catch (e) { $("bootmsg").textContent = "Failed: " + e.message; }
+});
+$("reboot").addEventListener("click", async () => {
+  if (!confirm("Reboot neo-mac-pro now?\n\nAny running inference job will be killed.")) return;
+  $("rebootmsg").textContent = "Requesting…";
+  try { const r = await post("/hardware/api/control/reboot"); $("rebootmsg").textContent = r.message; }
+  catch (e) { $("rebootmsg").textContent = "Failed: " + e.message; }
+});
+
+async function refresh() {
+  if (state.refreshing) return;
+  state.refreshing = true;
+  try {
+    if (state.tab === "storage") {
+      await window.neofandStorageRefresh();
+      $("status").textContent = "Storage · latest snapshot";
+      return;
+    }
+    $("status").textContent = "Loading…";
+    [state.metrics, state.latest] = await Promise.all([getJSON("/hardware/api/metrics"), getJSON("/hardware/api/latest")]);
+    window.neofandDiagramUpdate?.(state.latest);
+    window.neofandRuntime?.sample(state.latest);
+    renderSummary();
+    applyVisibility();
+
+    if (state.tab === "overview") {
+      state.lastChartRefresh = Date.now();
+      const dc = latestOf("smc_power", "PZ0E"), psu = latestOf("smc_power", "PZ7E");
+      const refs = [];
+      if (dc) refs.push({ value: dc, label: `DC ceiling ${dc.toFixed(0)} W` });
+      if (psu) refs.push({ value: psu, label: `PSU ceiling ${psu.toFixed(0)} W` });
+      await panel("system", "smc_power", ["PSTR", "PZ0G", "PZ7G"].filter(n => has("smc_power", n)), { zeroBase: true, refs });
+      await panel("gpupower", "gpu", namesIn("gpu", /power_w$/), { zeroBase: true });
+      // GPU dies and CPU package come from different subsystems but are the
+      // same measurement, so they belong on one chart -- and a CPU burn is
+      // invisible on a GPU-only temperature chart, which is exactly the gap
+      // this closes.
+      const gpuTemps = namesIn("gpu", /_temp_c$/);
+      const cpuTemps = namesIn("hwmon", /^coretemp/);
+      const [gt, ct] = await fetchMany([
+        { sub: "gpu", names: gpuTemps },
+        { sub: "hwmon", names: cpuTemps }
+      ]);
+      const tds = zeroFillGaps([
+        ...gt.map(x => ({ name: x.name.replace(/_temp_c$/, ""), points: x.points })),
+        ...ct.map(x => ({ name: "CPU package", points: x.points }))
+      ]);
+      render("temps", tds, {});
+      legend("temps", tds); dataTable("temps", tds); wireHover("temps");
+      await loadCooling();
+      await loadLoad();
+    } else if (state.tab === "power") {
+      renderHeadroom();
+      await loadEnergy();
+      const gz = zones().filter(x => x.cap > 0 && x.cap <= 600);
+      await panel("zones", "smc_power", gz.map(x => x.gauge), {
+        zeroBase: true,
+        refs: gz.map((x, i) => ({ value: x.cap, label: `${x.zone} ceiling`, color: slot(i) }))
+      });
+    }
+    else if (state.tab === "thermal") {
+      await panel("cputemp", "hwmon", namesIn("hwmon", /^(coretemp|pch|acpitz)/), {});
+      await panel("psutemp", "smc_temp", namesIn("smc_temp", /^Tp/), {});
+      await panel("storage", "hwmon", namesIn("hwmon", /^nvme/), {});
+      await panel("net", "hwmon", namesIn("hwmon", /^(enp|amdgpu)/), {});
+    }
+    else if (state.tab === "errors") await loadEvents();
+    else if (state.tab === "services") await loadServices();
+    else if (state.tab === "boot") await loadBoot();
+
+    $("status").textContent = `${state.metrics.length} channels · ${new Date().toLocaleTimeString()}`;
+  } catch (e) { window.neofandDiagramError?.(); window.neofandRuntime?.error(); $("status").textContent = "Error: " + e.message; } finally { state.refreshing = false; }
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Visibility.
+ *
+ * A card whose data is not plumbed on this machine is removed, not left
+ * showing "no data". The distinction that matters:
+ *
+ *   NOT PLUMBED  - no such channel exists here (no NVMe, no NIC sensors, a
+ *                  build without NVML, nothing configured). Hide it: the user
+ *                  can do nothing about it and an empty frame is just noise.
+ *   NOTHING YET  - the channel exists but has no rows in this window, or the
+ *                  event log is quiet. Keep it, with an explanatory empty
+ *                  state -- "no throttle events" is a *result*, not a gap.
+ *
+ * Tabs follow their cards, so navigation never leads somewhere blank.
+ * ------------------------------------------------------------------ */
+const CARD_REQS = {
+  system:   () => has("smc_power", "PSTR"),
+  gpupower: () => namesIn("gpu", /power_w$/).length > 0,
+  temps:    () => namesIn("gpu", /_temp_c$/).length > 0 || namesIn("hwmon", /^coretemp/).length > 0,
+  fans:     () => namesIn("fan", /^fan\d+_rpm$/).length > 0 || namesIn("gpu", /_fan_pct$/).length > 0,
+  load:     () => has("host", "cpu_pct") || namesIn("gpu", /_util_gpu_pct$/).length > 0,
+  energy:   () => has("smc_power", "PSTR"),
+  zones:    () => zones().length > 0,
+  cputemp:  () => namesIn("hwmon", /^(coretemp|pch|acpitz)/).length > 0,
+  psutemp:  () => namesIn("smc_temp", /^Tp/).length > 0,
+  storage:  () => namesIn("hwmon", /^nvme/).length > 0,
+  net:      () => namesIn("hwmon", /^(enp|amdgpu)/).length > 0
+};
+
+/* Cards with no chart, keyed by the element id of their content host. */
+const SECTION_REQS = {
+  summary:  () => state.metrics.length > 0,
+  headroom: () => zones().length > 0,
+  units:    () => !state.svc || state.svc.units.length > 0,
+  probes:   () => !state.svc || state.svc.probes.length > 0,
+  claims:   () => true,
+  events:   () => true,
+  whoami:   () => true,
+  boot:     () => state.bootOk !== false
+};
+
+const cardOf = (e) => (e ? e.closest("section.card") : null);
+
+function applyVisibility() {
+  for (const [key, ok] of Object.entries(CARD_REQS)) {
+    const card = document.querySelector(`[data-chart="${key}"]`);
+    if (card) card.hidden = !ok();
+  }
+  for (const [id, ok] of Object.entries(SECTION_REQS)) {
+    const card = cardOf($(id));
+    if (card) card.hidden = !ok();
+  }
+  let activeAlive = true;
+  TABS.forEach(t => {
+    const pane = $("tab-" + t), link = document.querySelector(`.rail a[data-tab="${t}"]`);
+    if (!pane || !link) return;
+    const cards = [...pane.querySelectorAll("section.card")];
+    // The sensor diagrams need the metric catalogue to identify available channels.
+    const alive = t === "sensors" ? state.metrics.length > 0 : cards.some(c => !c.hidden);
+    link.hidden = !alive;
+    if (!alive && state.tab === t) activeAlive = false;
+  });
+  if (!activeAlive) selectTab("overview");
+  buildStrip();
+}
+
+/* nav */
+const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];
+function selectTab(name) {
+  state.tab = name;
+  if(state.ranges[name])$("range").value=String(state.ranges[name]);
+  const historical = ['overview','power','thermal','errors'].includes(name);
+  $('range').hidden = !historical;
+  $('range-label').hidden = !historical;
+  document.querySelectorAll(".rail a[data-tab]").forEach(x => x.classList.toggle("sel", x.dataset.tab === name));
+  TABS.forEach(t => { const p = $("tab-" + t); if (p) p.hidden = t !== name; });
+  buildStrip();
+  window.neofandRuntime?.modeChanged();
+}
+
+/* The strip mirrors the rail rather than duplicating its markup, so a tab hidden
+   by applyVisibility() disappears from both without a second rule to keep in
+   sync. */
+function buildStrip() {
+  const strip = $("tabstrip");
+  if (!strip) return;
+  strip.replaceChildren();
+  document.querySelectorAll(".rail a[data-tab]").forEach(a => {
+    if (a.hidden) return;
+    const b = el("button", a.dataset.tab === state.tab ? "sel" : null);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", a.dataset.tab === state.tab ? "true" : "false");
+    b.textContent = a.textContent.trim();
+    b.addEventListener("click", () => {
+      selectTab(a.dataset.tab);
+      refresh();
+      b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    });
+    strip.appendChild(b);
+  });
+}
+document.querySelectorAll(".rail a[data-tab]").forEach(a => a.addEventListener("click", () => {
+  selectTab(a.dataset.tab);
+  document.body.classList.remove("nav");
+  $("navbtn").setAttribute("aria-expanded", "false");
+  refresh();
+}));
+$("navbtn").addEventListener("click", () => {
+  const open = document.body.classList.toggle("nav");
+  $("navbtn").setAttribute("aria-expanded", open ? "true" : "false");
+});
+$("scrim").addEventListener("click", () => {
+  document.body.classList.remove("nav");
+  $("navbtn").setAttribute("aria-expanded", "false");
+});
+
+/* table toggles */
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
+  const k = b.dataset.view, box = $("d-" + k);
+  const show = box.hidden;
+  box.hidden = !show;
+  b.classList.toggle("on", show);
+  b.textContent = show ? "Chart" : "Table";
+  b.closest(".card").querySelector(".plot").hidden = show;
+  b.closest(".card").querySelector(".legend").hidden = show;
+  // The canvas measured zero while hidden, so it must be redrawn once it has a
+  // width again -- otherwise it comes back blank.
+  if (!show) requestAnimationFrame(() => redraw(k));
+}));
+
+$("refresh").addEventListener("click", refresh);
+$("range").addEventListener("change",()=>{state.ranges[state.tab]=rangeSecs();refresh();});
+let rz;
+window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(refresh, 250); });
+
+/* Re-render on an OS theme flip so the chart colours follow the page.
+ *
+ * Guarded, and deliberately placed AFTER the first refresh(): Safari before 14
+ * exposes MediaQueryList without addEventListener (it had the older addListener),
+ * so calling it unguarded throws at parse-completion time -- and because this was
+ * the last statement before refresh(), that single throw meant the page never
+ * loaded any data at all. Everything downstream looked "dead" for a reason that
+ * had nothing to do with the charts. */
+const requestedTab = location.hash.slice(1);
+selectTab(TABS.includes(requestedTab)?requestedTab:"overview");
+refresh();
+try {
+  const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq) {
+    if (mq.addEventListener) mq.addEventListener("change", refresh);
+    else if (mq.addListener) mq.addListener(refresh);
+  }
+} catch (e) { /* theme following is optional; never let it take the page down */ }
+</script>
+</body>
+</html>

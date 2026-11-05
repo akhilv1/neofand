@@ -1,0 +1,12 @@
+[Unit]
+Description=Read-only hardware dashboard storage snapshot
+
+[Service]
+Type=oneshot
+User=neo
+ExecStart=/usr/bin/python3 -B /home/neo/services/neofand-dashboard/storage_collect.py /home/neo/services/neofand-dashboard/telemetry/storage.json
+TimeoutStartSec=20
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/neo/services/neofand-dashboard/telemetry

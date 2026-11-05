@@ -1,0 +1,45 @@
+:4791 {
+    bind 127.0.0.1
+
+    @events {
+        path /api/host-events
+        method GET
+    }
+    handle @events {
+        rewrite * /events
+        reverse_proxy 127.0.0.1:4792
+    }
+
+    @storage {
+        path /api/host-storage
+        method GET
+    }
+    handle @storage {
+        rewrite * /storage
+        reverse_proxy 127.0.0.1:4792
+    }
+
+    @memory {
+        path /api/host-memory
+        method GET
+    }
+    handle @memory {
+        rewrite * /memory
+        reverse_proxy 127.0.0.1:4792
+    }
+
+    @apiGet {
+        path /api/*
+        method GET
+    }
+    handle @apiGet {
+        reverse_proxy 100.99.26.65:9977
+    }
+    handle /api/* {
+        respond "Method not allowed" 405
+    }
+    handle {
+        root * /srv
+        file_server
+    }
+}

@@ -1,0 +1,45 @@
+services:
+  dashboard:
+    image: caddy:2-alpine
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /config
+      - /data
+    volumes:
+      - /home/neo/services/neofand-dashboard/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /home/neo/services/neofand-dashboard/index.html:/srv/index.html:ro
+      - /home/neo/services/neofand-dashboard/assets:/srv/assets:ro
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4791/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  memory:
+    image: python:3.12-alpine
+    user: "65534:65534"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    mem_limit: 48m
+    cpus: 0.25
+    ports:
+      - "127.0.0.1:4792:8080"
+    volumes:
+      - /home/neo/services/neofand-dashboard/memory_api.py:/app/memory_api.py:ro
+      - /home/neo/services/neofand-dashboard/telemetry:/host/telemetry:ro
+      - /proc/meminfo:/host/meminfo:ro
+      - /proc/pressure/memory:/host/memory-pressure:ro
+    command: ["python", "-B", "/app/memory_api.py"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/memory"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,16 @@
+:8080 {
+    @apiGet {
+        path /api/*
+        method GET
+    }
+    handle @apiGet {
+        reverse_proxy telemetry:8080
+    }
+    handle /api/* {
+        respond "Method not allowed" 405
+    }
+    handle {
+        root * /srv
+        file_server
+    }
+}

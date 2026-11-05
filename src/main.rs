@@ -21,6 +21,7 @@ use std::{
     path::PathBuf,
     process::ExitCode,
     sync::{atomic::AtomicBool, Arc},
+    time::{Duration, Instant},
 };
 
 use arraydeque::ArrayDeque;
@@ -28,15 +29,28 @@ use fan_controller::{FanController, Readings};
 use nonempty::NonEmpty as NonEmptyVec;
 use signal_hook::consts::{SIGINT, SIGTERM};
 
-use config::{load_config, CoverMode, MAX_FALL_SAMPLES};
+use config::{load_config, CoverMode, FanSource, GpuFanConfig, MAX_FALL_SAMPLES};
 use error::{Error, Result};
 
 mod config;
 mod error;
 mod fan_controller;
 mod gpu;
+#[cfg(feature = "logging")]
+mod logdb;
 mod nvidia;
 mod smc;
+mod status;
+#[cfg(feature = "logging")]
+mod telemetry;
+#[cfg(feature = "web")]
+mod control;
+#[cfg(feature = "web")]
+mod services;
+#[cfg(feature = "web")]
+mod tsauth;
+#[cfg(feature = "web")]
+mod web;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("This tool is only developed for Linux systems.");
@@ -140,13 +154,23 @@ fn read_temp_file(temp_file: &mut std::fs::File, temp_buf: &mut String) -> Resul
 /// Holds both file-backed (hwmon/sysfs) and NVML-backed sources, because NVIDIA
 /// exposes no hwmon node and must be read through its own library.
 struct TempGroup {
-    files: Vec<std::fs::File>,
+    /// Description alongside each handle, so the status snapshot can report a
+    /// per-sensor breakdown rather than only this group's reduced maximum.
+    files: Vec<(String, std::fs::File)>,
     nvidia: Option<nvidia::NvidiaBackend>,
     history: TempHistory,
     fall_samples: usize,
 }
 
 impl TempGroup {
+    /// The NVML backend, when this group has one.
+    ///
+    /// Exposed so the control loop can drive the NVIDIA cards' own fans, which
+    /// needs per-device temperatures rather than this group's reduced maximum.
+    fn nvidia(&self) -> Option<&nvidia::NvidiaBackend> {
+        self.nvidia.as_ref()
+    }
+
     /// Open a set of already-discovered sensor paths.
     fn from_paths<I>(label: &str, paths: I, fall_samples: usize, temp_buf: &mut String) -> Self
     where
@@ -160,10 +184,19 @@ impl TempGroup {
             };
 
             // Only keep sensors that actually parse, so a bogus node cannot
-            // take the daemon down mid-loop.
+            // take the daemon down mid-loop. Say so when one is dropped: a
+            // silent skip here is indistinguishable from the sensor never being
+            // discovered, which sends you looking at the config instead of the
+            // hardware.
             if read_temp_file(&mut file, temp_buf).is_ok() {
                 println!("neofand: {label} sensor {desc}");
-                files.push(file);
+                files.push((desc, file));
+            } else {
+                eprintln!(
+                    "neofand: WARNING ignoring {label} sensor {desc} — {} did not parse as a \
+                     temperature",
+                    path.display()
+                );
             }
         }
 
@@ -208,7 +241,7 @@ impl TempGroup {
     /// demand rather than an error.
     fn read_max(&mut self, temp_buf: &mut String) -> Result<u8> {
         let mut max = 0;
-        for file in &mut self.files {
+        for (_, file) in &mut self.files {
             let temp = read_temp_file(file, temp_buf)?;
             if temp > max {
                 max = temp;
@@ -225,6 +258,26 @@ impl TempGroup {
         }
 
         Ok(max)
+    }
+
+    /// Every individual sensor in this group, for the status snapshot.
+    ///
+    /// Distinct from [`read_max`]: that reduces to one number for the curve,
+    /// which hides *which* of several sensors is the hot one. A failed read is
+    /// skipped rather than propagated -- status must never break control.
+    fn read_each(&mut self, temp_buf: &mut String) -> Vec<(String, u8)> {
+        let mut out = Vec::new();
+        for (desc, file) in &mut self.files {
+            if let Ok(temp) = read_temp_file(file, temp_buf) {
+                out.push((desc.clone(), temp));
+            }
+        }
+        if let Some(backend) = &self.nvidia {
+            for (index, temp) in backend.temps_each() {
+                out.push((format!("nvml [{index}]"), temp));
+            }
+        }
+        out
     }
 
     /// Rise immediately, fall on the trailing average.
@@ -250,7 +303,102 @@ impl TempGroup {
     }
 }
 
+/// Seconds since the epoch, or 0 if the clock is before it.
+fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+/// Discover GPU temperature channels, re-scanning until the set stops growing.
+///
+/// A GPU driver publishes its hwmon node at the end of its probe, which can land
+/// after this daemon has already started — measured 9.1 s late for amdgpu on a
+/// MacPro7,1. A single scan at startup therefore silently misses the card for the
+/// lifetime of the process.
+///
+/// Cards cannot be swapped on a running machine, so this settles once and then
+/// stops rather than polling forever. It returns as soon as two consecutive scans
+/// agree, so the common case where everything is already bound costs one extra
+/// second rather than the whole window.
+fn settle_gpu_sensors(config: &config::GpuConfig) -> Result<Vec<gpu::Sensor>> {
+    const AGREEING_SCANS: u32 = 2;
+
+    let mut best = gpu::discover(config)?;
+    if config.settle_secs == 0 {
+        return Ok(best);
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(config.settle_secs);
+    let mut stable = 0;
+
+    while Instant::now() < deadline {
+        std::thread::sleep(Duration::from_secs(1));
+        let scan = gpu::discover(config)?;
+
+        if scan.len() == best.len() {
+            stable += 1;
+            if stable >= AGREEING_SCANS {
+                break;
+            }
+            continue;
+        }
+
+        // Only ever grow the set. A channel that disappears mid-settle is a
+        // driver still rearranging itself, not a card being removed, so keeping
+        // the larger set avoids latching onto a transient.
+        if scan.len() > best.len() {
+            for sensor in &scan {
+                if !best.iter().any(|existing| existing.path == sensor.path) {
+                    println!(
+                        "neofand: gpu appeared {:.1}s after start: {}",
+                        config.settle_secs as f64
+                            - (deadline - Instant::now()).as_secs_f64(),
+                        sensor.desc
+                    );
+                }
+            }
+            best = scan;
+        }
+        stable = 0;
+    }
+
+    Ok(best)
+}
+
 fn main() -> ExitCode {
+    // `--status` is a plain reader of the published snapshot -- it never talks to
+    // the daemon, which is the whole point: querying cannot disturb fan control.
+    // It also needs no privileges, unlike the daemon itself.
+    let mut args = std::env::args().skip(1);
+    if let Some(flag) = args.next() {
+        return match flag.as_str() {
+            "--status" => {
+                let path = args.next().unwrap_or_else(|| {
+                    config::GeneralConfig::default().status_path
+                });
+                match status::print(std::path::Path::new(&path)) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(err) => {
+                        eprintln!("neofand: cannot read {path}: {err}");
+                        eprintln!("  is the daemon running, and is status_path set in [General]?");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            "--help" | "-h" => {
+                println!("neofand -- per-component fan daemon");
+                println!("  neofand                    run the daemon (needs root)");
+                println!("  neofand --status [PATH]    print the latest sensor snapshot");
+                ExitCode::SUCCESS
+            }
+            other => {
+                eprintln!("neofand: unknown argument {other}; try --help");
+                ExitCode::FAILURE
+            }
+        };
+    }
+
     match real_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
@@ -281,8 +429,15 @@ fn start_temp_loop(
     smc: Option<&smc::Smc>,
     cover_mode: CoverMode,
     fans: &NonEmptyVec<FanController>,
+    gpu_fans: GpuFanConfig,
+    status_path: &str,
+    profile_name: &str,
+    config_file: &str,
+    fall_samples: usize,
     poll: std::time::Duration,
+    telemetry: &mut TelemetrySink,
 ) -> Result<()> {
+    let started = now_unix();
     let cancellation_token = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(SIGINT, cancellation_token.clone()).map_err(Error::Signal)?;
     signal_hook::flag::register(SIGTERM, cancellation_token.clone()).map_err(Error::Signal)?;
@@ -380,11 +535,129 @@ fn start_temp_loop(
         {
             last = Some(readings);
             for fan in fans {
-                fan.set_speed(fan.calc_speed(&readings, cover_open))?;
+                fan.set_speed(fan.commanded_speed(&readings, cover_open))?;
             }
         }
 
+        // The cards' own fans, driven per-card. Deliberately outside the
+        // `readings_changed` gate above: that compares the *reduced* group
+        // maximum, so one card warming while the hottest holds steady leaves
+        // the readings equal and would skip this card's ramp entirely.
+        let mut gpu_fan_status = Vec::new();
+        if gpu_fans.enabled {
+            if let Some(backend) = gpu_group.nvidia() {
+                for target in backend.fan_targets() {
+                    let percent = fan_controller::gpu_fan_percent(&target, &gpu_fans);
+                    let percent = if cover_open {
+                        // Same argument as the chassis cover-open floor: with the
+                        // cover off there is no chassis static pressure, so the
+                        // card's own blower is doing all the work.
+                        percent.max(gpu_fans.max_percent)
+                    } else {
+                        percent
+                    };
+                    backend.set_fan_percent(target.index, percent);
+
+                    if !status_path.is_empty() {
+                        // Only the target belongs here; everything else about the
+                        // card comes from `full_status()`, which also covers cards
+                        // this daemon does not drive.
+                        gpu_fan_status.push(status::GpuFan {
+                            index: target.index,
+                            target_pct: Some(percent),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Publish what this poll just read. Failures are swallowed on purpose: a
+        // status file that cannot be written must never take fan control down.
+        if !status_path.is_empty() {
+            let cards = gpu_group
+                .nvidia()
+                .map(nvidia::NvidiaBackend::full_status)
+                .unwrap_or_default();
+            // Re-read per-sensor values for the breakdown. Cheap sysfs reads, and
+            // it keeps `effective()` above as the single path the curve depends
+            // on rather than teeing off it.
+            let gpu_sensors = gpu_group.read_each(&mut temp_buffer);
+            let cpu_sensors = cpu_group.read_each(&mut temp_buffer);
+            let psu_sensors = psu_group.read_each(&mut temp_buffer);
+
+            let snapshot = status::Snapshot {
+                unix_time: now_unix(),
+                daemon: status::Daemon {
+                    version: env!("CARGO_PKG_VERSION"),
+                    pid: std::process::id(),
+                    started_unix: started,
+                    uptime_secs: now_unix().saturating_sub(started),
+                    config_file: config_file.to_owned(),
+                    profile: profile_name.to_owned(),
+                    poll_secs: poll.as_secs(),
+                    fall_samples,
+                    cover_mode: cover_mode.to_string(),
+                    holding_manual,
+                    gpu_fan_control: gpu_fans.enabled,
+                },
+                smc: status::Smc {
+                    present: smc.is_some(),
+                    keys: smc.map_or(0, smc::Smc::key_count),
+                    cover_open,
+                    gpu_throttle: throttled,
+                    system_power_w: readings.watts,
+                },
+                groups: vec![
+                    status::TempGroup {
+                        name: "gpu",
+                        effective_c: readings.gpu,
+                        sensors: gpu_sensors,
+                    },
+                    status::TempGroup {
+                        name: "cpu",
+                        effective_c: readings.cpu,
+                        sensors: cpu_sensors,
+                    },
+                    status::TempGroup {
+                        name: "psu",
+                        effective_c: readings.psu,
+                        sensors: psu_sensors,
+                    },
+                ],
+                chassis_fans: fans
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, f)| status::ChassisFan {
+                        number: i + 1,
+                        source: f.source(),
+                        target_rpm: f.calc_speed(&readings, cover_open),
+                        actual_rpm: f.actual_rpm(),
+                        min_rpm: f.min_speed(),
+                        max_rpm: f.max_speed(),
+                        explain: f.explain(&readings),
+                    })
+                    .collect(),
+                cards,
+                gpu_targets: gpu_fan_status,
+            };
+            let _ = snapshot.publish(std::path::Path::new(status_path));
+        }
+
+        // Independent of `status_path`, and rate-limited internally to the
+        // logging interval rather than the poll interval.
+        record_telemetry(telemetry, smc, fans, &readings, cover_open, &gpu_group);
+
         std::thread::sleep(poll);
+    }
+
+    // Hand the cards' fans back before returning. The chassis fans have the
+    // unit's `ExecStopPost` as a SIGKILL backstop; NVML settings have no such
+    // net, so a clean exit must undo them explicitly.
+    if gpu_fans.enabled {
+        if let Some(backend) = gpu_group.nvidia() {
+            backend.restore_fans();
+            println!("neofand: returned GPU fans to the driver curve");
+        }
     }
 
     Ok(())
@@ -436,9 +709,57 @@ fn real_main() -> Result<()> {
         );
     }
 
-    // Captured before `config.fans` is consumed below.
-    let highest_gpu_high = config
-        .fans
+    // GPU discovery has to finish before the fans are built, because a fan's GPU
+    // thresholds may be derived from what the cards themselves report.
+    let gpu_sensors = settle_gpu_sensors(&config.gpu)?;
+    let gpu_limit = gpu::min_limit(&gpu_sensors);
+
+    // Auto-derive each fan's GPU ramp from the hardware, where the config asked
+    // for it by leaving both thresholds at 0. Done per fan rather than globally
+    // so a fan with explicit numbers keeps them.
+    let derived = config::GpuFanConfig::derive_chassis_ramp(gpu_limit);
+    // Started here, before `config` is picked apart below and before the loop
+    // claims the fans, so a misconfigured database or an already-bound port is
+    // reported up front rather than mid-run.
+    let mut telemetry = telemetry_init(&config.logging, smc.as_ref());
+    web_init(&config.web, &config.logging);
+
+    let mut config_fans = config.fans;
+    for fan in &mut config_fans {
+        if fan.gpu_low_temp != 0 || fan.gpu_high_temp != 0 {
+            continue;
+        }
+        match derived {
+            Some((low, high)) => {
+                fan.gpu_low_temp = low;
+                fan.gpu_high_temp = high;
+            }
+            None => {
+                // Nothing published a limit, so there is nothing to derive from.
+                // Fall back to the documented pair rather than leaving 0/0, which
+                // would make the ramp demand 0 forever.
+                fan.gpu_low_temp = config::FALLBACK_LOW;
+                fan.gpu_high_temp = config::FALLBACK_HIGH;
+                eprintln!(
+                    "neofand: WARNING gpu thresholds set to auto but no GPU published a limit \
+                     — falling back to {}-{} C",
+                    config::FALLBACK_LOW,
+                    config::FALLBACK_HIGH
+                );
+            }
+        }
+    }
+    if config_fans.iter().any(|f| f.source == FanSource::Gpu) {
+        if let (Some(limit), Some((low, high))) = (gpu_limit, derived) {
+            println!(
+                "neofand: gpu chassis ramp {low}-{high} C auto-derived from the coolest \
+                 throttle point present ({limit} C)"
+            );
+        }
+    }
+
+    // Captured before `config_fans` is consumed below.
+    let highest_gpu_high = config_fans
         .iter()
         .map(|f| f.gpu_high_temp)
         .max()
@@ -446,18 +767,21 @@ fn real_main() -> Result<()> {
 
     let fans = fan_paths
         .into_iter()
-        .zip(config.fans)
+        .zip(config_fans)
         .map(|(path, fan_config)| FanController::new(path, fan_config))
         .collect::<Result<Vec<_>>>()?;
     let fans = NonEmptyVec::from_vec(fans).ok_or(Error::NoFan)?;
 
-    let gpu_sensors = gpu::discover(&config.gpu)?
+    let gpu_sensors = gpu_sensors
         .into_iter()
         .map(|s| (s.path, s.desc))
         .collect::<Vec<_>>();
 
     let nvidia = if config.gpu.use_nvml {
-        nvidia::NvidiaBackend::init(config.gpu.sensor_preference.wants_memory())
+        nvidia::NvidiaBackend::init(
+            config.gpu.sensor_preference.wants_memory(),
+            config.gpu_fans,
+        )
     } else {
         None
     };
@@ -475,6 +799,31 @@ fn real_main() -> Result<()> {
                  until the GPU is already throttling. Lower gpu_high_temp to ~{} C.",
                 slowdown.saturating_sub(8)
             );
+        }
+    }
+
+    if config.gpu_fans.enabled {
+        match nvidia.as_ref() {
+            Some(backend) if backend.has_controllable_fans() => println!(
+                // Per-card ramps are reported next to each card in the sensor
+                // lines above, since with auto-derivation they can differ.
+                "neofand: GPU fans {}-{}%, {}, ramp {} (per-card, each follows its own die)",
+                config.gpu_fans.min_percent,
+                config.gpu_fans.max_percent,
+                config.gpu_fans.curve,
+                if config.gpu_fans.low_temp == 0 || config.gpu_fans.high_temp == 0 {
+                    "auto-derived from each card's slowdown threshold"
+                } else {
+                    "from config"
+                },
+            ),
+            // Enabled but unusable is worth saying out loud: the cards are then
+            // still on their firmware curve, which is the thing the setting was
+            // turned on to replace.
+            _ => eprintln!(
+                "neofand: WARNING [GpuFans] enabled but no NVIDIA card exposes a controllable \
+                 fan — the cards stay on their own firmware curve"
+            ),
         }
     }
 
@@ -532,7 +881,13 @@ fn real_main() -> Result<()> {
         smc.as_ref(),
         config.general.cover_mode,
         &fans,
+        config.gpu_fans,
+        &config.general.status_path,
+        &config.general.profile.to_string(),
+        config::config_file_path(),
+        config.general.fall_samples,
         config.general.poll_interval,
+        &mut telemetry,
     );
 
     println!("\nneofand: shutting down, returning fans to SMC control...");
@@ -545,4 +900,223 @@ fn real_main() -> Result<()> {
         (Err(err), _) | (_, Err(err)) => Err(err),
         (Ok(()), Ok(())) => Ok(()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry sink
+//
+// Two feature-selected shapes so the control loop has exactly one call site and
+// no inline `cfg`. With `logging` off these compile to a unit type and empty
+// functions, which optimise away entirely.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "logging")]
+struct Telemetry {
+    logger: logdb::Logger,
+    collector: telemetry::Collector,
+    /// CPU/memory sampling keeps rate state between samples, so it is owned here
+    /// rather than constructed per poll.
+    host: telemetry::HostLoad,
+    hwmon: telemetry::Hwmon,
+    interval: std::time::Duration,
+    last: Option<std::time::Instant>,
+}
+
+#[cfg(feature = "logging")]
+type TelemetrySink = Option<Telemetry>;
+#[cfg(not(feature = "logging"))]
+type TelemetrySink = ();
+
+#[cfg(feature = "logging")]
+fn telemetry_init(logging: &config::LoggingConfig, smc: Option<&smc::Smc>) -> TelemetrySink {
+    if !logging.enabled {
+        return None;
+    }
+
+    // The SMC is the point of this store -- the `P*` zone data is unreachable
+    // from any other process while the daemon runs. Without it there is little
+    // worth logging, so say so rather than quietly recording a thin subset.
+    let Some(smc) = smc else {
+        eprintln!("neofand: telemetry enabled but no SMC was found — not logging");
+        return None;
+    };
+
+    let collector = telemetry::Collector::new(smc);
+    let hwmon = telemetry::Hwmon::discover();
+    match logdb::Logger::spawn(logging) {
+        Ok(logger) => {
+            eprintln!(
+                "neofand: telemetry -> {} every {}s, retention {}d ({} electrical keys, \
+                 {} SMC temperature channels, {} hwmon channels)",
+                logging.db_path,
+                logging.interval.as_secs(),
+                logging.retention_days,
+                collector.power_key_count(),
+                collector.temp_count(),
+                hwmon.len(),
+            );
+            Some(Telemetry {
+                logger,
+                collector,
+                host: telemetry::HostLoad::default(),
+                hwmon,
+                interval: logging.interval,
+                last: None,
+            })
+        }
+        Err(e) => {
+            // Never fatal: fan control is the daemon's actual job.
+            eprintln!("neofand: telemetry disabled — {e}");
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "logging"))]
+fn telemetry_init(_logging: &config::LoggingConfig, _smc: Option<&smc::Smc>) -> TelemetrySink {}
+
+#[cfg(feature = "web")]
+fn web_init(web: &config::WebConfig, logging: &config::LoggingConfig) {
+    if !web.enabled {
+        return;
+    }
+    if !logging.enabled {
+        eprintln!("neofand: web enabled but logging is not — the dashboard would have no history");
+    }
+    match web::spawn(web, &logging.db_path) {
+        Ok(()) => eprintln!("neofand: dashboard on http://{}/", web.bind),
+        Err(e) => eprintln!("neofand: web disabled — {e}"),
+    }
+}
+
+#[cfg(not(feature = "web"))]
+fn web_init(_web: &config::WebConfig, _logging: &config::LoggingConfig) {}
+
+#[cfg(feature = "logging")]
+fn record_telemetry(
+    sink: &mut TelemetrySink,
+    smc: Option<&smc::Smc>,
+    fans: &NonEmptyVec<FanController>,
+    readings: &Readings,
+    cover_open: bool,
+    gpu_group: &TempGroup,
+) {
+    let Some(state) = sink.as_mut() else {
+        return;
+    };
+
+    let now = std::time::Instant::now();
+    if state
+        .last
+        .is_some_and(|last| now.duration_since(last) < state.interval)
+    {
+        return;
+    }
+    state.last = Some(now);
+
+    let mut out = Vec::with_capacity(512);
+
+    if let Some(smc) = smc {
+        state.collector.collect(smc, &mut out);
+    }
+    state.host.sample(&mut out);
+    state.hwmon.collect(&mut out);
+
+    for (i, fan) in fans.into_iter().enumerate() {
+        let number = i + 1;
+        // Target and actual are both recorded because they diverge by design on
+        // this hardware: `fan1_max` under-reports, so a fan asked for more than
+        // it reports as its ceiling is normal, not a fault.
+        out.push(telemetry::Reading::new(
+            "fan",
+            format!("fan{number}_target_rpm"),
+            "rpm",
+            f64::from(fan.calc_speed(readings, cover_open)),
+            telemetry::Kind::Rpm,
+        ));
+        if let Some(rpm) = fan.last_commanded_rpm() {
+            out.push(telemetry::Reading::new(
+                "fan",
+                format!("fan{number}_commanded_rpm"),
+                "rpm",
+                f64::from(rpm),
+                telemetry::Kind::Rpm,
+            ));
+        }
+        if let Some(rpm) = fan.actual_rpm() {
+            out.push(telemetry::Reading::new(
+                "fan",
+                format!("fan{number}_rpm"),
+                "rpm",
+                f64::from(rpm),
+                telemetry::Kind::Rpm,
+            ));
+        }
+        // The ceiling is what makes RPM comparable across fans with different
+        // ranges, and comparable to the cards' percent-duty blowers. Static, so
+        // the deadband collapses it to one row.
+        out.push(telemetry::Reading::new(
+            "fan",
+            format!("fan{number}_max_rpm"),
+            "rpm",
+            f64::from(fan.max_speed()),
+            telemetry::Kind::Rpm,
+        ));
+    }
+
+    if let Some(nvidia) = gpu_group.nvidia() {
+        for card in nvidia.full_status() {
+            let index = card.index;
+            let mut push = |suffix: &str, unit, value: f64, kind| {
+                out.push(telemetry::Reading::new(
+                    "gpu",
+                    format!("gpu{index}_{suffix}"),
+                    unit,
+                    value,
+                    kind,
+                ));
+            };
+            if let Some(v) = card.power_w {
+                push("power_w", "W", f64::from(v), telemetry::Kind::Power);
+            }
+            if let Some(v) = card.temp_c {
+                push("temp_c", "C", f64::from(v), telemetry::Kind::Temp);
+            }
+            if let Some(v) = card.mem_temp_c {
+                push("mem_temp_c", "C", f64::from(v), telemetry::Kind::Temp);
+            }
+            if let Some(v) = card.fan_actual_pct {
+                push("fan_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+            if let Some(v) = card.mem_used_bytes {
+                push("mem_used_bytes", "B", v as f64, telemetry::Kind::Bytes);
+            }
+            if let Some(v) = card.mem_total_bytes {
+                push("mem_total_bytes", "B", v as f64, telemetry::Kind::Bytes);
+            }
+            if let Some(v) = card.util_gpu_pct {
+                push("util_gpu_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+            if let Some(v) = card.util_mem_pct {
+                push("util_mem_pct", "%", f64::from(v), telemetry::Kind::Percent);
+            }
+        }
+    }
+
+    state.logger.submit(telemetry::Sample {
+        unix_time: now_unix(),
+        readings: out,
+    });
+}
+
+#[cfg(not(feature = "logging"))]
+#[allow(clippy::needless_pass_by_ref_mut)]
+fn record_telemetry(
+    _sink: &mut TelemetrySink,
+    _smc: Option<&smc::Smc>,
+    _fans: &NonEmptyVec<FanController>,
+    _readings: &Readings,
+    _cover_open: bool,
+    _gpu_group: &TempGroup,
+) {
 }

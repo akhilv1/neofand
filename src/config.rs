@@ -7,10 +7,16 @@ const CONFIG_FILE: &str = "./neofand.conf";
 #[cfg(not(debug_assertions))]
 const CONFIG_FILE: &str = "/etc/neofand.conf";
 
+/// The config file this build reads, for the status snapshot.
+#[must_use]
+pub fn config_file_path() -> &'static str {
+    CONFIG_FILE
+}
+
 /// Upper bound on the fall-off window. The runtime value is clamped to this.
 pub const MAX_FALL_SAMPLES: usize = 60;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpeedCurve {
     Linear,
     Exponential,
@@ -319,6 +325,18 @@ pub struct GpuConfig {
     /// the only way to see them; harmless to leave on with no NVIDIA driver
     /// present, since the library is loaded at runtime.
     pub use_nvml: bool,
+    /// How long to keep re-scanning for GPUs after startup, in seconds.
+    ///
+    /// A GPU driver registers its hwmon node at the end of its probe, which can
+    /// land well after this daemon starts: measured 9.1 s late for amdgpu on a
+    /// MacPro7,1 (VBIOS fetch from VFCT, then display-core init, then hwmon).
+    /// Scanning once at startup therefore misses the card permanently and looks
+    /// exactly like a misconfiguration. Re-scanning for a window costs one
+    /// directory walk per second and then stops.
+    ///
+    /// Cards cannot be changed while the machine runs, so this is a startup
+    /// settle window rather than continuous polling. 0 disables it.
+    pub settle_secs: u64,
 }
 
 impl Default for GpuConfig {
@@ -331,6 +349,7 @@ impl Default for GpuConfig {
             sensor_preference: SensorPreference::Junction,
             extra_temp_paths: Vec::new(),
             use_nvml: true,
+            settle_secs: 30,
         }
     }
 }
@@ -346,9 +365,18 @@ impl SensorPreference {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+// Clone, not Copy: `status_path` is a String. Nothing copies this by value in a
+// hot path -- it is read once at startup.
+#[derive(Clone, Debug)]
 pub struct GeneralConfig {
     pub profile: Profile,
+    /// Where to publish the sensor snapshot each poll. Empty disables it.
+    ///
+    /// A file rather than a socket so that reading it cannot perturb the control
+    /// loop -- see `status.rs`. It is the only way to reach SMC `PSTR` while the
+    /// daemon is running, since scanning `key_at_index` for it would corrupt the
+    /// daemon's own reads.
+    pub status_path: String,
     pub poll_interval: Duration,
     pub fall_samples: usize,
     /// How to handle the cover being off. See [`CoverMode`].
@@ -359,6 +387,8 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             profile: Profile::Balanced,
+            // Alongside /run/neofand.pid; needs no directory of its own.
+            status_path: "/run/neofand.status.json".to_owned(),
             // Junction has been observed climbing ~9 C in 4 s under a dense
             // compute load, so polling must be brisk.
             poll_interval: Duration::from_secs(1),
@@ -368,10 +398,232 @@ impl Default for GeneralConfig {
     }
 }
 
+/// Persist every sensor the daemon reads to a local SQLite database.
+///
+/// Off by default. The daemon's job is fan control; a store that grows without
+/// being asked for is not something a fan daemon should do uninvited.
+///
+/// ## Why this lives in the daemon rather than a separate collector
+///
+/// `smc.rs` documents the constraint: `key_at_index` is a single shared index
+/// register, so only one process can read raw SMC keys. The daemon already holds
+/// that role. An external logger would have to either corrupt the daemon's reads
+/// or stop it — which is why the `P*` power zones were unreachable while the
+/// daemon ran, until now.
+pub struct LoggingConfig {
+    pub enabled: bool,
+    pub db_path: String,
+    /// How often to write a sample. Independent of `poll_interval`: fan control
+    /// wants 1 s reactions, but a year of 1 Hz rows across ~360 metrics is tens
+    /// of GB for resolution nothing reads back.
+    pub interval: Duration,
+    pub retention_days: u32,
+    /// Minimum change before a reading is written again. Suppresses the large
+    /// idle majority of channels that never move.
+    ///
+    /// Discrete flags (`GTHR`, `MSCO`, `PZ*T`) bypass this entirely and are
+    /// always written on change — a throttle trip between two samples is exactly
+    /// the event worth having, and a deadband would swallow it.
+    pub deadband_temp_c: f64,
+    pub deadband_power_w: f64,
+    pub deadband_rpm: f64,
+    /// Write an unchanged reading anyway after this long, so a flat channel
+    /// still has anchor points and charts do not interpolate across hours.
+    pub heartbeat_secs: u64,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            db_path: "/var/lib/neofand/telemetry.db".to_owned(),
+            interval: Duration::from_secs(10),
+            retention_days: 365,
+            deadband_temp_c: 0.5,
+            deadband_power_w: 1.0,
+            deadband_rpm: 20.0,
+            heartbeat_secs: 300,
+        }
+    }
+}
+
+/// Dashboard, JSON query API, and the control plane.
+pub struct WebConfig {
+    pub enabled: bool,
+    /// Defaults to loopback. Exposes the machine's full thermal and power
+    /// history, so widening it is an explicit choice rather than a default.
+    ///
+    /// **Bind to a specific Tailscale address, never `0.0.0.0`, when control is
+    /// enabled.** Authorization identifies the caller by its tailnet address; if
+    /// the listener also accepts LAN packets, a local host can forge a `100.x`
+    /// source address and be mistaken for a tailnet peer. Binding to the
+    /// tailscale0 address means the packet must have come through the tunnel.
+    pub bind: String,
+    /// Permit the POST control endpoints (reboot, boot device) at all.
+    pub allow_control: bool,
+    /// Tailscale login names allowed to use them, e.g. `akhil@example.com`.
+    ///
+    /// Membership of the tailnet is deliberately *not* sufficient: a tailnet
+    /// commonly has several people on it, and rebooting this machine should not
+    /// be available to all of them.
+    pub control_users: Vec<String>,
+    /// systemd units to report health for on the services tab.
+    pub services: Vec<String>,
+    /// `name=url` HTTP probes, for things that do not run under systemd.
+    pub probes: Vec<(String, String)>,
+    /// Electricity price per kWh, in whatever currency you think in. 0 disables
+    /// the cost readout and leaves the energy chart in watt-hours only.
+    pub cost_per_kwh: f64,
+}
+
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: "127.0.0.1:9977".to_owned(),
+            allow_control: false,
+            control_users: Vec::new(),
+            services: Vec::new(),
+            probes: Vec::new(),
+            cost_per_kwh: 0.0,
+        }
+    }
+}
+
 pub struct Config {
     pub general: GeneralConfig,
     pub gpu: GpuConfig,
+    pub gpu_fans: GpuFanConfig,
     pub fans: Vec<FanConfig>,
+    pub logging: LoggingConfig,
+    pub web: WebConfig,
+}
+
+/// Control of the GPUs' **own** fans, as opposed to the chassis fans.
+///
+/// Separate from `[FanN]` because the units and the topology both differ: these
+/// are per-card duty-cycle percentages, not chassis RPM, and each card follows
+/// its own die rather than the hottest one in the box. On MacPro7,1 that
+/// distinction is measurable — under a 300 W burn GPU2 sat 4-6 C cooler than
+/// GPU0/GPU1 purely from slot airflow, so a shared curve would over-drive one
+/// card or under-drive the others.
+///
+/// Off by default: this takes fan control away from the card firmware, and a
+/// daemon that grabs it uninvited on every machine that happens to have an
+/// NVIDIA GPU is not a safe default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GpuFanConfig {
+    pub enabled: bool,
+    /// Ramp start, °C. `0` means derive it from the card's own slowdown
+    /// threshold — see [`AUTO_HIGH_MARGIN`].
+    pub low_temp: u8,
+    /// Full speed at this temperature, °C. `0` means derive it, as above.
+    pub high_temp: u8,
+    /// Duty floor. Clamped up to [`MIN_USEFUL_PERCENT`], below which a blower
+    /// moves too little air to cool a loaded card.
+    pub min_percent: u8,
+    pub max_percent: u8,
+    pub curve: SpeedCurve,
+}
+
+/// Degrees below a card's slowdown threshold at which its fan reaches maximum.
+///
+/// The fan has to be at full speed *before* the card starts clocking down,
+/// otherwise it is reacting to throttling rather than preventing it. Measured on
+/// this hardware: the A6000s report a 95 C slowdown and were picking up
+/// sw-thermal at 88 C on the stock curve, so the ramp has to finish comfortably
+/// under that.
+pub const AUTO_HIGH_MARGIN: u8 = 15;
+
+/// Width of the derived ramp, in degrees below `high_temp`.
+pub const AUTO_RAMP_WIDTH: u8 = 25;
+
+/// Duty cycle below which a GPU blower is not usefully cooling anything.
+pub const MIN_USEFUL_PERCENT: u8 = 30;
+
+/// Fallback ramp for a card whose driver will not report a slowdown threshold.
+/// Deliberately conservative: it ramps early rather than trusting an unknown.
+pub const FALLBACK_LOW: u8 = 50;
+pub const FALLBACK_HIGH: u8 = 75;
+
+impl GpuFanConfig {
+    /// Resolve the ramp for one card, given the slowdown threshold NVML reports
+    /// for it (`None` when the driver will not say).
+    ///
+    /// Auto-derivation is per-card on purpose: thresholds vary by model, so a
+    /// box with mixed GPUs needs a different curve for each rather than one
+    /// tuned to whichever card happened to be measured.
+    /// Derive a chassis-fan GPU ramp from the hardware's own throttle point.
+    ///
+    /// Same margins as [`GpuFanConfig::resolve_ramp`] so a card's own blower and
+    /// the chassis fans that feed it agree on when things are getting hot. Kept
+    /// separate because the chassis fans take a single reduced temperature for
+    /// every GPU at once, so the caller passes the *coolest* limit present.
+    ///
+    /// Returns `None` when nothing published a usable limit, leaving the caller's
+    /// configured thresholds in place rather than inventing a ramp.
+    pub fn derive_chassis_ramp(limit: Option<u32>) -> Option<(u8, u8)> {
+        let limit = u8::try_from(limit?).ok()?;
+
+        // The full ramp has to fit below the limit without either end
+        // saturating. Checking `high > low` afterwards is not enough: a 20 C
+        // limit yields high=5, low=0, which passes that test while describing a
+        // ramp that is finished before any real GPU has warmed up. Anything this
+        // cool is a bogus or misread threshold, not silicon.
+        if limit <= AUTO_HIGH_MARGIN + AUTO_RAMP_WIDTH {
+            return None;
+        }
+
+        let high = limit - AUTO_HIGH_MARGIN;
+        let low = high - AUTO_RAMP_WIDTH;
+        Some((low, high))
+    }
+
+    pub fn resolve_ramp(&self, slowdown: Option<u32>) -> (u8, u8) {
+        // An explicit pair in the config always wins; auto only fills in what
+        // was left at 0.
+        if self.low_temp > 0 && self.high_temp > 0 {
+            return (self.low_temp, self.high_temp);
+        }
+
+        let high = match slowdown {
+            Some(slowdown) => u8::try_from(slowdown)
+                .unwrap_or(u8::MAX)
+                .saturating_sub(AUTO_HIGH_MARGIN),
+            None => FALLBACK_HIGH,
+        };
+        let low = high.saturating_sub(AUTO_RAMP_WIDTH);
+
+        // A partially-specified pair keeps whichever half was given.
+        let low = if self.low_temp > 0 { self.low_temp } else { low };
+        let high = if self.high_temp > 0 {
+            self.high_temp
+        } else {
+            high
+        };
+
+        // Guard against a config or a threshold that inverts the pair, which
+        // would make `demand` return 0 forever and silently disable the ramp.
+        if high <= low {
+            (FALLBACK_LOW, FALLBACK_HIGH)
+        } else {
+            (low, high)
+        }
+    }
+}
+
+impl Default for GpuFanConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            // 0 = derive per card from its own slowdown threshold.
+            low_temp: 0,
+            high_temp: 0,
+            min_percent: MIN_USEFUL_PERCENT,
+            max_percent: 100,
+            curve: SpeedCurve::Linear,
+        }
+    }
 }
 
 /// Read a key, warning and falling back rather than failing.
@@ -428,6 +680,7 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
 
     let general = GeneralConfig {
         profile,
+        status_path: get_or(general_section, "status_path", defaults.status_path.clone()),
         poll_interval: Duration::from_secs(poll_secs.max(1)),
         fall_samples: fall_samples.clamp(1, MAX_FALL_SAMPLES),
         // `cover_interlock=false` is honoured as a legacy alias for the old
@@ -450,6 +703,7 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         ),
         extra_temp_paths: get_list(gpu_section, "extra_temp_paths", Vec::new()),
         use_nvml: get_or(gpu_section, "use_nvml", gpu_defaults.use_nvml),
+        settle_secs: get_or(gpu_section, "settle_secs", gpu_defaults.settle_secs),
     };
 
     // Profile supplies the baseline; per-fan keys override individual fields.
@@ -474,10 +728,84 @@ fn parse(file_raw: &str, fan_count: NonZeroUsize) -> Result<Config> {
         });
     }
 
+    let gpu_fan_section = file.section(Some("GpuFans"));
+    let gpu_fan_defaults = GpuFanConfig::default();
+    let gpu_fans = GpuFanConfig {
+        enabled: get_or(gpu_fan_section, "enabled", gpu_fan_defaults.enabled),
+        low_temp: get_or(gpu_fan_section, "low_temp", gpu_fan_defaults.low_temp),
+        high_temp: get_or(gpu_fan_section, "high_temp", gpu_fan_defaults.high_temp),
+        // Clamped rather than rejected, for the same reason as every other key
+        // here: a bad value should degrade to something safe, not stop the
+        // daemon. The floor is 30 because a slower blower cannot cool the card.
+        min_percent: get_or(gpu_fan_section, "min_percent", gpu_fan_defaults.min_percent)
+            .clamp(MIN_USEFUL_PERCENT, 100),
+        max_percent: get_or(gpu_fan_section, "max_percent", gpu_fan_defaults.max_percent)
+            .clamp(MIN_USEFUL_PERCENT, 100),
+        curve: get_or(gpu_fan_section, "curve", gpu_fan_defaults.curve),
+    };
+
+    let logging_section = file.section(Some("Logging"));
+    let logging_defaults = LoggingConfig::default();
+    let logging_secs: u64 = get_or(
+        logging_section,
+        "interval_secs",
+        logging_defaults.interval.as_secs(),
+    );
+    let logging = LoggingConfig {
+        enabled: get_or(logging_section, "enabled", logging_defaults.enabled),
+        db_path: get_or(logging_section, "db_path", logging_defaults.db_path.clone()),
+        interval: Duration::from_secs(logging_secs.max(1)),
+        retention_days: get_or(
+            logging_section,
+            "retention_days",
+            logging_defaults.retention_days,
+        ),
+        deadband_temp_c: get_or(
+            logging_section,
+            "deadband_temp_c",
+            logging_defaults.deadband_temp_c,
+        ),
+        deadband_power_w: get_or(
+            logging_section,
+            "deadband_power_w",
+            logging_defaults.deadband_power_w,
+        ),
+        deadband_rpm: get_or(logging_section, "deadband_rpm", logging_defaults.deadband_rpm),
+        heartbeat_secs: get_or(
+            logging_section,
+            "heartbeat_secs",
+            logging_defaults.heartbeat_secs,
+        ),
+    };
+
+    let web_section = file.section(Some("Web"));
+    let web_defaults = WebConfig::default();
+    let web = WebConfig {
+        enabled: get_or(web_section, "enabled", web_defaults.enabled),
+        bind: get_or(web_section, "bind", web_defaults.bind.clone()),
+        allow_control: get_or(web_section, "allow_control", web_defaults.allow_control),
+        control_users: get_list(web_section, "control_users", Vec::new()),
+        services: get_list(web_section, "services", Vec::new()),
+        // `name=url,name=url`. Entries without an `=` are dropped rather than
+        // guessed at, so a typo shows up as a missing probe instead of a probe
+        // pointing somewhere unintended.
+        probes: get_list(web_section, "probes", Vec::new())
+            .into_iter()
+            .filter_map(|entry| {
+                let (name, url) = entry.split_once('=')?;
+                Some((name.trim().to_owned(), url.trim().to_owned()))
+            })
+            .collect(),
+        cost_per_kwh: get_or(web_section, "cost_per_kwh", web_defaults.cost_per_kwh),
+    };
+
     Ok(Config {
         general,
         gpu,
+        gpu_fans,
         fans,
+        logging,
+        web,
     })
 }
 
@@ -493,13 +821,26 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
             general.poll_interval.as_secs().to_string(),
         )
         .set("fall_samples", general.fall_samples.to_string())
-        .set("cover_mode", general.cover_mode.to_string());
+        .set("cover_mode", general.cover_mode.to_string())
+        .set("status_path", general.status_path.clone());
 
     file.with_section(Some("Gpu"))
         .set("drivers", gpu.drivers.join(","))
         .set("sensor_preference", gpu.sensor_preference.to_string())
         .set("extra_temp_paths", gpu.extra_temp_paths.join(","))
-        .set("use_nvml", gpu.use_nvml.to_string());
+        .set("use_nvml", gpu.use_nvml.to_string())
+        .set("settle_secs", gpu.settle_secs.to_string());
+
+    // Written out disabled, with the thresholds visible, so the keys are
+    // discoverable without reaching for the README.
+    let gpu_fans = GpuFanConfig::default();
+    file.with_section(Some("GpuFans"))
+        .set("enabled", gpu_fans.enabled.to_string())
+        .set("low_temp", gpu_fans.low_temp.to_string())
+        .set("high_temp", gpu_fans.high_temp.to_string())
+        .set("min_percent", gpu_fans.min_percent.to_string())
+        .set("max_percent", gpu_fans.max_percent.to_string())
+        .set("curve", gpu_fans.curve.to_string());
 
     // Fan sections are written empty on purpose. Thresholds come from the
     // profile, so writing them here would silently pin the fans to whatever
@@ -516,7 +857,10 @@ fn generate(fan_count: NonZeroUsize) -> Result<Config> {
     Ok(Config {
         general,
         gpu,
+        gpu_fans,
         fans: vec![base; fan_count.get()],
+        logging: LoggingConfig::default(),
+        web: WebConfig::default(),
     })
 }
 
@@ -525,5 +869,91 @@ pub fn load_config(fan_count: NonZeroUsize) -> Result<Config> {
         Ok(file_raw) => parse(&file_raw, fan_count),
         Err(err) if err.kind() == ErrorKind::NotFound => generate(fan_count),
         Err(err) => Err(Error::ConfigRead(err)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cfg(low: u8, high: u8) -> GpuFanConfig {
+        GpuFanConfig {
+            low_temp: low,
+            high_temp: high,
+            ..GpuFanConfig::default()
+        }
+    }
+
+    #[test]
+    fn derives_ramp_from_slowdown() {
+        // The A6000s report 95 C, which is what these constants were chosen
+        // against: a 55-80 C ramp finishes well before the card clocks down.
+        assert_eq!(cfg(0, 0).resolve_ramp(Some(95)), (55, 80));
+    }
+
+    #[test]
+    fn chassis_ramp_tracks_the_coolest_card() {
+        // The RX 460 publishes temp1_crit=94 C and the A6000s report a 95 C
+        // slowdown, so a box holding both must ramp for the 94 C card.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(94)), Some((54, 79)));
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(95)), Some((55, 80)));
+    }
+
+    #[test]
+    fn chassis_ramp_declines_rather_than_inventing_one() {
+        // No limit published means the caller keeps its configured thresholds.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(None), None);
+        // A limit so low the ramp would invert is refused, not clamped into a
+        // pair that makes the fan demand 0 forever.
+        assert_eq!(GpuFanConfig::derive_chassis_ramp(Some(20)), None);
+    }
+
+    #[test]
+    fn chassis_and_card_ramps_agree_on_the_same_limit() {
+        // The card's own blower and the chassis fans feeding it should not
+        // disagree about when the card is getting hot.
+        assert_eq!(
+            GpuFanConfig::derive_chassis_ramp(Some(95)),
+            Some(cfg(0, 0).resolve_ramp(Some(95)))
+        );
+    }
+
+    #[test]
+    fn derives_per_card_rather_than_globally() {
+        // The point of deriving at all: two different cards get two different
+        // ramps from the same config.
+        let config = cfg(0, 0);
+        assert_ne!(config.resolve_ramp(Some(95)), config.resolve_ramp(Some(83)));
+        assert_eq!(config.resolve_ramp(Some(83)), (43, 68));
+    }
+
+    #[test]
+    fn explicit_config_wins_over_derivation() {
+        assert_eq!(cfg(60, 85).resolve_ramp(Some(95)), (60, 85));
+    }
+
+    #[test]
+    fn half_specified_pair_derives_only_the_other_half() {
+        assert_eq!(cfg(70, 0).resolve_ramp(Some(95)), (70, 80));
+        assert_eq!(cfg(0, 90).resolve_ramp(Some(95)), (55, 90));
+    }
+
+    #[test]
+    fn unknown_slowdown_uses_fallback() {
+        assert_eq!(cfg(0, 0).resolve_ramp(None), (FALLBACK_LOW, FALLBACK_HIGH));
+    }
+
+    #[test]
+    fn inverted_pair_falls_back_instead_of_disabling_the_ramp() {
+        // `demand` returns 0.0 forever when high <= low, which would leave the
+        // fan pinned at min_percent and look like fan control simply not working.
+        assert_eq!(cfg(90, 0).resolve_ramp(Some(95)), (FALLBACK_LOW, FALLBACK_HIGH));
+    }
+
+    #[test]
+    fn absurdly_low_slowdown_does_not_underflow() {
+        // saturating_sub, not `-`: a card claiming a 10 C slowdown must not wrap.
+        let (low, high) = cfg(0, 0).resolve_ramp(Some(10));
+        assert!(low < high, "ramp must stay ordered, got {low}-{high}");
     }
 }

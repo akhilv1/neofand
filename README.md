@@ -330,18 +330,173 @@ per-fan thresholds is the cleanest way to pin NVIDIA-appropriate values.
 
 ### What this does and does not control
 
-neofand drives **chassis/system fans**. It does not attempt to control an NVIDIA
-card's own fan: NVIDIA gates that behind X11 with `Coolbits` via
-`nvidia-settings`, which is awkward on a headless compute box, and blower-style
-cards manage their own fan curve in firmware perfectly well. The value here is
-making chassis airflow respond to GPU load so the card has cool intake air and
-its exhaust actually leaves the case.
+neofand drives **chassis/system fans**, and — with `[GpuFans] enabled=true` — the
+NVIDIA cards' **own** fans as well. See [GPU fan control](#gpu-fan-control).
+
+Chassis control is still the more important half: it makes airflow respond to GPU
+load so the card has cool intake air and its exhaust actually leaves the case.
+No card fan can compensate for hot intake.
+
+## GPU fan control
+
+Off by default. Taking fan control from the card firmware is not a safe thing to
+do uninvited on every machine that happens to have an NVIDIA GPU, so it must be
+asked for.
+
+This does **not** go through X11 and `Coolbits`/`nvidia-settings`. It calls
+`nvmlDeviceSetFanSpeed_v2` directly, so it works headless with no X server,
+no `DISPLAY`, and no session — which matters for a daemon that starts before
+anyone logs in. (`nvml-wrapper` exposes no fan setters, so the three fan entry
+points are called through the raw `nvml-wrapper-sys` bindings it already
+depends on. Reads and device handles still come from the safe wrapper.)
+
+### Why it exists: the firmware curve leaves performance on the table
+
+Measured on this hardware, 3x RTX A6000, sustained cuBLAS TF32 SGEMM on all
+three cards at a 300 W per-card limit:
+
+| | stock firmware curve | neofand `[GpuFans]` |
+|---|---|---|
+| GPU0 / GPU1 | 88 C at ~57% fan | **79 C at 97% fan** |
+| GPU2 | 84 C | **73 C at 80% fan** |
+| combined draw | 836 W | **855 W** |
+| `sw-thermal` asserted | yes, GPU0+GPU1 | no |
+
+At 88 C the top two cards picked up `sw-thermal` and fell back to 268/274 W —
+*below their own power limit*. They were giving up roughly 25 W each to heat
+while their blowers sat at 57%. The firmware curve is tuned to protect the card,
+not to keep it at its limit, and those are different goals.
+
+### Each card follows its own die
+
+Per-card, not driven by the hottest card in the box. On this machine GPU2 sits
+4-6 C cooler than GPU0/GPU1 purely from slot airflow, and runs its fan at 80%
+while the others are at 97%. A shared curve would either over-drive GPU2 or
+under-cool the other two.
+
+### Thresholds are derived per card
+
+With `low_temp=0`/`high_temp=0` (the default) the ramp is computed from the
+slowdown threshold **NVML reports for that specific card**:
+
+```
+high_temp = slowdown - 15      # fan is at maximum before the card clocks down
+low_temp  = high_temp - 25
+```
+
+The A6000s report a 95 C slowdown, giving a 55-80 C ramp. A box with mixed GPUs
+gets a correct curve for each rather than one tuned to whichever card was
+measured. Set either key to a non-zero value to override that half explicitly;
+an inverted or nonsensical pair falls back to a conservative 50-75 C rather than
+silently disabling the ramp.
+
+A card reporting no controllable fans is skipped for control but still read for
+temperature, so it continues to drive the chassis fans.
+
+### Restoring control
+
+Manual fan settings **persist in the driver after the process exits** — that is
+NVML's behaviour, not a bug. A clean shutdown calls
+`nvmlDeviceSetDefaultFanSpeed_v2` and logs `returned GPU fans to the driver
+curve`. Note the asymmetry with the chassis fans: those have `ExecStopPost` in
+the unit as a SIGKILL backstop, but there is no equivalent net for NVML, so a
+`SIGKILL` leaves the card fans wherever they were last set. To recover, restart
+the daemon and stop it cleanly, or set the fans back with `nvidia-settings`.
 
 ### GPUs NVML cannot see
 
 For anything neither hwmon nor NVML covers, `extra_temp_paths` takes globs
 pointing at any file containing a millidegree-Celsius integer — including one
 written by an external poller.
+
+## Querying it
+
+`neofand --status` prints the daemon's complete state — every sensor, every fan,
+every card — without touching it:
+
+```console
+$ neofand --status
+{
+  "daemon": { "version": "0.1.0", "pid": 68527, "uptime_secs": 3,
+              "config_file": "/etc/neofand.conf", "profile": "turbo",
+              "poll_secs": 1, "fall_samples": 20, "cover_mode": "floor",
+              "holding_manual": true, "gpu_fan_control": true },
+  "smc":    { "present": true, "keys": 1363, "cover_open": false,
+              "gpu_throttle": false, "system_power_w": 646.9 },
+  "temps": {
+    "gpu": { "effective_c": 64, "sensors": [
+      {"sensor": "amdgpu 0000:0b:00.0 temp2_input (junction)", "temp_c": 52},
+      {"sensor": "nvml [0]", "temp_c": 64}, ... ] },
+    "cpu": { "effective_c": 61, "sensors": [...] },
+    "psu": { "effective_c": 47, "sensors": [{"sensor": "Tp2F", "temp_c": 47}, ...] }
+  },
+  "chassis_fans": [
+    { "fan": 1, "source": "psu", "curve": "logarithmic",
+      "target_rpm": 1348, "actual_rpm": 1344, "min_rpm": 500, "max_rpm": 1500,
+      "cover_open_rpm": 1350, "always_full_speed": false,
+      "deciding_input": "system_power",
+      "inputs": [
+        {"name": "psu_temp",     "unit": "C", "value":  47.0, "low":  45.0, "high":  70.0, "demand": 0.080},
+        {"name": "system_power", "unit": "W", "value": 646.9, "low": 250.0, "high": 900.0, "demand": 0.611}
+      ] }, ...
+  ],
+  "cards": [
+    {"index": 0, "name": "NVIDIA RTX A6000", "bus_id": "00000000:14:00.0",
+     "temp_c": 64, "mem_temp_c": null, "power_w": 112.3, "fans": 1,
+     "controllable": true, "fan_target_pct": 55, "fan_actual_pct": 52,
+     "ramp_low_c": 55, "ramp_high_c": 80, "slowdown_c": 95}, ...
+  ]
+}
+```
+
+The daemon republishes this every poll to `status_path` (default
+`/run/neofand.status.json`); set it empty to disable. `--status` just reads that
+file, so it needs no privileges and cannot disturb anything. Any other reader
+works equally well — `jq . /run/neofand.status.json`, a Prometheus textfile
+collector, whatever.
+
+### Reading it
+
+**`temps` breaks each group down per sensor**, not just the reduced maximum the
+curve consumes. `effective_c` is what the curve sees, after the trailing-average
+fall filter. The individual entries show which sensor is actually the hot one —
+above, the gpu group reads 64 °C because of the NVIDIA cards while the two Vega
+dies sit at 52 °C, which is why `fan2`/`fan3` (the MPX bays) are following the
+NVIDIA cards.
+
+**`inputs` and `deciding_input` explain each fan's speed.** A `source` maps to
+one or two signals, each with its own thresholds, and the higher demand wins —
+that arbitration is invisible from the resulting RPM. Above, `fan1` is at 1348
+because *power* wants 0.611 while PSU temperature only wants 0.080, exactly the
+feed-forward behaviour [described below](#psu-fan-and-total-system-power).
+
+**`cards` lists every NVML card**, including any with `controllable: false` — a
+card with no fan NVML will expose is still read for temperature and still drives
+the chassis fans, so omitting it would hide a real heat source. `ramp_low_c` /
+`ramp_high_c` are the per-card values derived from that card's own `slowdown_c`.
+
+### target vs actual
+
+Both are published for every fan and every card deliberately. `fan1_max`
+under-reports on MacPro7,1 (see
+[`max_rpm`](#max_rpm-and-why-hardware-maxima-are-not-trustworthy)), and a card can
+decline a fan request, so a fan that cannot reach what it was asked for is only
+visible by comparing the two. Expect a few seconds of divergence after startup
+while fans spin up — that is ramp, not shortfall.
+
+### Why a file and not a socket
+
+`system_power_w` is SMC `PSTR`, total system power. Reaching it directly means
+scanning `key_at_index` — 887 of 1363 keys on this machine — and that register is
+a *single shared index*, so an external scan corrupts the daemon's own reads
+mid-flight (see [`smc.rs`](src/smc.rs)). Before this existed, the only honest way
+to sample total power was to stop the daemon first.
+
+A socket would have meant a second thread touching that state, or a non-blocking
+accept woven through the control loop. The file avoids both: the daemon already
+reads every sensor each poll, so publishing is just serialising what it holds.
+The write is temp-file-plus-`rename`, which is atomic, so a reader sees either
+the previous complete snapshot or the next one — never a partial one.
 
 ## Full configuration
 
@@ -353,12 +508,21 @@ profile=balanced          ; quiet | balanced | turbo | custom
 poll_interval_secs=1      ; minimum 1
 fall_samples=20           ; trailing-average window, max 60
 cover_mode=floor          ; floor | release | off  — see Cover detection
+status_path=/run/neofand.status.json   ; sensor snapshot; empty disables
 
 [Gpu]
 drivers=amdgpu,radeon,nouveau,i915,xe
 sensor_preference=junction
 extra_temp_paths=
 use_nvml=true             ; NVIDIA via NVML; harmless with no NVIDIA driver
+
+[GpuFans]                 ; the NVIDIA cards' OWN fans — see GPU fan control
+enabled=false             ; off by default: takes control from card firmware
+low_temp=0                ; 0 = derive per card from its slowdown threshold
+high_temp=0               ; 0 = derive (slowdown - 15)
+min_percent=30            ; duty floor; clamped up to 30 (below that moves no air)
+max_percent=100
+curve=linear              ; linear | exponential | logarithmic
 
 [Fan1]
 source=psu                ; gpu | cpu | psu | gpu+cpu   (default gpu+cpu)
