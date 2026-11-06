@@ -20,6 +20,7 @@ for tab in ('services','boot'):
 # Summary must not report absent Apple SMC flags as healthy/closed.
 a=html.index('function renderSummary()');b=html.index('\nlet eventRequest=',a)
 html=html[:a]+'''function renderSummary() {
+ window.neofandResourcesUpdate?.(state.latest);
  const val=(s,n)=>latestOf(s,n), f=(v,u)=>v==null?'Unavailable':v.toFixed(1)+' '+u;
  const info=window.neofandHostInfo||{},host=info.host||{},gpu=info.gpus?.[0];
  const rows=[['Platform',host.display_name||host.product_family||host.product_version||'Connecting'],['CPU',host.cpu||'Unavailable'],

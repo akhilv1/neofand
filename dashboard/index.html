@@ -309,6 +309,8 @@
 <script src="/hardware/assets/storage-index.js?v=20261105-7"></script>
 <script src="/hardware/assets/storage-groups.js?v=20261105-7"></script>
 <script src="/hardware/assets/storage.js?v=20261105-guest-capacity"></script>
+<link rel="stylesheet" href="/hardware/assets/resource-dials.css?v=20261105-1">
+<script src="/hardware/assets/resource-dials.js?v=20261105-1" defer></script>
 </head>
 <body>
 
@@ -1288,6 +1290,7 @@ function renderHeadroom() {
 }
 
 function renderSummary() {
+  window.neofandResourcesUpdate?.(state.latest);
   const z = zones(), worst = z.reduce((a, b) => {
     const pa = a && a.cap ? a.now / a.cap : -1, pb = b.cap ? b.now / b.cap : -1;
     return pb > pa ? b : a;

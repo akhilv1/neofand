@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const {models,ratio}=require('./resource-dials.js');
+assert.equal(ratio(undefined,100),null);assert.equal(ratio(1,0),null);assert.equal(ratio(120,100),100);
+const memory={used_bytes:75,total_bytes:100,timestamp:1},storage={totals:{used_bytes:10,available_bytes:90},timestamp:1};
+const pve={timestamp:1,guest_storage:[{vmid:100,status:'ok',filesystems:[{mountpoint:'/volume2',used_bytes:73,total_bytes:100},{mountpoint:'/volume2',used_bytes:73,total_bytes:100}]},{vmid:101,status:'unavailable'}],guests:[{type:'qemu',status:'running'},{type:'lxc',status:'stopped'}]};
+const d=models([{subsystem:'host',name:'cpu_pct',value:7,ts:1}],memory,storage,pve,{proxmox_available:true});
+assert.equal(d.length,5);assert.equal(d[2].value,10);assert.equal(d[3].value,73);assert.match(d[3].note,/1 of 2/);assert.equal(d[4].display,'1 / 2');
+const g=models([{subsystem:'gpu',name:'gpu0_util_gpu_pct',value:20,ts:1},{subsystem:'gpu',name:'gpu1_util_gpu_pct',value:60,ts:1},{subsystem:'gpu',name:'gpu0_mem_total_bytes',value:100,ts:1},{subsystem:'gpu',name:'gpu0_mem_used_bytes',value:25,ts:1}],memory,storage,null,{gpus:[{}]});
+assert.equal(g.length,5);assert.equal(g[2].value,40);assert.equal(g[3].value,25);
+assert.equal(models([],null,null,null,{}).length,3);
+console.log('Resource dials: missing values, mirror deduplication, partial guest reporting, GPU aggregation passed');
