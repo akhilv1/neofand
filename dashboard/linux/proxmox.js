@@ -2,8 +2,21 @@
  const element=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
  const gib=n=>Number.isFinite(n)?(n/1073741824).toFixed(1)+' GiB':'—';
  const pct=n=>Number.isFinite(n)?(n*100).toFixed(1)+'%':'—';
+ // Presentation-only screenshot mode: raw API data remains private to this deployment.
+ const redact=new URLSearchParams(location.search).get('redact')==='1';
+ if(redact&&new URLSearchParams(location.search).get('capture')==='1'){
+  document.documentElement.classList.add('readme-capture');
+  const style=document.createElement('style');style.textContent='.readme-capture .topbar,.readme-capture .rail,.readme-capture .tabstrip,.readme-capture .filters{display:none!important}.readme-capture .shell{min-height:0}.readme-capture main{max-width:1200px;margin:0 auto;padding:20px}.readme-capture #tab-overview>:not(.resource-overview):not(.pve-systems){display:none!important}';document.head.append(style);
+ }
+ function redacted(d){
+  const copy=JSON.parse(JSON.stringify(d)),ids=new Map();
+  (copy.guests||[]).forEach((g,i)=>{const label=(g.type==='qemu'?'Virtual machine ':'Container ')+String(i+1).padStart(2,'0');ids.set(g.vmid,{vmid:i+1,name:label});g.vmid=i+1;g.name=label;});
+  for(const list of [copy.guest_storage,copy.storage_uses])for(const g of list||[])Object.assign(g,ids.get(g.vmid)||{vmid:0,name:'Guest'});
+  for(const task of copy.tasks||[])task.id=ids.get(Number(task.id))?.vmid||'';
+  copy.node='Proxmox host';return copy;
+ }
  let snapshot=null, fetchedAt=0;
- async function read(){const r=await fetch('/hardware/api/proxmox',{cache:'no-store'});if(!r.ok)throw Error('Proxmox unavailable');snapshot=await r.json();fetchedAt=Date.now();return snapshot;}
+ async function read(){const r=await fetch('/hardware/api/proxmox',{cache:'no-store'});if(!r.ok)throw Error('Proxmox unavailable');const data=await r.json();snapshot=redact?redacted(data):data;fetchedAt=Date.now();return snapshot;}
  function table(headers,rows){const t=element('table'),head=element('thead'),body=element('tbody'),tr=element('tr');headers.forEach(h=>tr.append(element('th',h)));head.append(tr);rows.forEach(row=>{const r=element('tr');row.forEach(c=>r.append(element('td',c??'—')));body.append(r)});t.append(head,body);return t;}
  function tiles(d){const target=document.getElementById('pve-guest-tiles');if(!target)return;target.replaceChildren();const guests=d.guests||[];
   document.getElementById('pve-guest-count').textContent=`${guests.filter(g=>g.type==='qemu').length} VMs · ${guests.filter(g=>g.type==='lxc').length} LXCs`;

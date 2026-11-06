@@ -34,11 +34,11 @@ def snapshot():
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path not in ('/memory', '/storage', '/events'):
+        if self.path not in ('/memory', '/storage', '/events', '/portainer'):
             self.send_error(404)
             return
         try:
-            data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/'+('system-events.json' if self.path=='/events' else 'storage.json')).read_text())
+            data = snapshot() if self.path == '/memory' else json.loads(Path('/host/telemetry/'+('system-events.json' if self.path=='/events' else 'portainer.json' if self.path=='/portainer' else 'storage.json')).read_text())
             if self.path == '/events':
                 data.pop('boot_evidence',None)
             if self.path == '/storage':

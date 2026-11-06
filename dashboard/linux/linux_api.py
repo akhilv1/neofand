@@ -87,6 +87,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/series': data=series(parse_qs(url.query,max_num_fields=16),telemetry_file('linux.sqlite'))
             elif path=='/api/host-events':
                 data=host_events()
+            elif path=='/api/portainer': data=json.loads((DATA/'portainer.json').read_text())
             elif path=='/api/proxmox': data=json.loads((DATA/'proxmox.json').read_text())
             elif path=='/api/host-storage': data=json.loads(telemetry_file('storage.json').read_text())
             elif path=='/api/events': data={'events':[]}

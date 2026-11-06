@@ -13,3 +13,5 @@ Images depict live telemetry over illustrative chassis artwork. Anchor positions
 are approximate. P620 board variant/slot are not verified; its PSU consumption
 and chassis fan speeds are unavailable. These are documentation samples, not
 performance benchmarks.
+
+- `proxmox-overview.jpg`: resource dials and VM/LXC tiles from the live Proxmox dashboard. Guest names and IDs were replaced with generic labels using `?redact=1&capture=1` presentation mode before capture; host identity, sidebar and network address were omitted before capture. Numeric readings and guest states are unchanged. This mode only affects display: it does not sanitize the API or make the dashboard safe to publish.

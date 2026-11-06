@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh the hardware Portainer inventory
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=30s
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,23 @@
+[Unit]
+Description=Read-only Docker inventory for the hardware Portainer page
+After=docker.service
+[Service]
+Type=oneshot
+User=neo
+ExecStart=/usr/bin/python3 -B /home/neo/services/neofand-dashboard/portainer_collect.py /home/neo/services/neofand-dashboard/telemetry/portainer.json
+TimeoutStartSec=75
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/home/neo/services/neofand-dashboard/telemetry
+TasksMax=48
+MemoryMax=128M
+UMask=0022
