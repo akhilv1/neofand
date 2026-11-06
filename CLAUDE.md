@@ -8,7 +8,9 @@ wrong answers along the way — live in
 Read that before probing hardware or changing fan behaviour. It is the document
 that records what was measured rather than assumed.
 
-User-facing configuration and behaviour are documented in [README.md](README.md).
+User-facing configuration and behaviour are documented in [docs/fan-control.md](docs/fan-control.md).
+
+The full multiplatform application is maintained in https://github.com/akhilv1/hardware-dashboard. Do not reintroduce its collectors or container packaging here; retain the native API and embedded diagnostic console.
 
 ## Build
 

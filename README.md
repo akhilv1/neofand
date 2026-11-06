@@ -1,50 +1,25 @@
 # neofand
 
-Hardware monitoring and per-component fan control for Linux workstations.
-Live dashboards bring together temperatures, CPU/GPU load, memory pressure,
-fan speeds, power, storage usage and system events.
+Per-component fan control and SMC telemetry for Mac Pro 7,1 running Linux.
+The daemon runs as a host systemd service, independently of Docker and the web UI.
 
-## Choose your setup
+The multiplatform monitoring application has moved to
+**[Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)**.
+That repository owns the full dashboard, GPU builder, Linux/P620 collectors,
+Proxmox and Docker integrations, and Docker/LXC packaging. It can monitor Linux
+and Proxmox without this daemon.
 
-| Platform | Support | Guide |
-|---|---|---|
-| Mac Pro 7,1 on Linux | Apple SMC fan control, PSU power, cover interlock, NVIDIA/AMD sensors and two-sided chassis diagrams | [Fan daemon](#quick-start-mac-pro) · [Dashboard](dashboard/README.md) |
-| Linux / ThinkStation P620 | Read-only CPU, RAM/PSI, hwmon and NVIDIA/AMD telemetry, storage and events | [Linux adapter](dashboard/linux/README.md) |
-| Proxmox LXC | Native web/API services with a separate physical-host collector; node, VM/container and task status | [LXC installation](dashboard/lxc/README.md) |
+## What this repository owns
 
-Missing hardware readings remain unavailable. The Linux adapter and Proxmox
-collectors are read-only; fan control belongs to the Mac Pro daemon.
+- Mac Pro chassis fan curves, damping, safety floors and cover interlock.
+- Apple SMC decoding and NVIDIA/AMD sensor integration; optional NVIDIA fan control.
+- A published status snapshot and optional SQLite telemetry/history.
+- The optional native API and small self-contained diagnostic console.
+- Host systemd installation and cleanup that returns fans to automatic control.
 
-## See it running
-
-**Mac Pro with three RTX A6000s**
-
-![Mac Pro live sensor diagram](docs/screenshots/mac-pro-gpu-sensors.jpg)
-
-[Memory / PSU view](docs/screenshots/mac-pro-memory-sensors.jpg) ·
-[ThinkStation P620 / RTX 3090](docs/screenshots/p620-sensors.jpg)
-
-Live captures with identifying information cropped out. Chassis artwork and
-sensor positions are illustrative; see [capture notes](docs/screenshots/README.md).
-
-**Proxmox host, VM/LXC inventory, and resource overview**
-
-![Proxmox resource dials and anonymized guest tiles](docs/screenshots/proxmox-overview.jpg)
-
-Guest names and IDs are anonymized, and host/network identity is omitted. Resource readings and guest states are unchanged.
-
-Bare-metal Docker hosts also have a **Portainer** page with container state, health checks, Compose projects, CPU/RAM usage and a link to the management UI. The page reads a host-generated snapshot; the web container has no Docker socket or Portainer credentials. [Setup and access model](dashboard/PORTAINER.md).
-
-## What’s included
-
-- **Sensors and history:** load bars, temperatures, fan speeds, board/system power
-  where available, memory usage/pressure, auto/live controls and sample timestamps.
-- **Storage:** raw drives, boot/system badges, used/available space, category
-  indexing with a metadata cache, and ZFS mirror/pool accounting.
-- **GPU builder:** combine PCIe cards and Apple MPX modules in chassis views,
-  with dimensions, slot occupancy and collision checks. [GPU library](dashboard/assets/gpu-library/README.md).
-- **Events:** host warnings and restart history; telemetry gaps alone do not
-  establish a power outage.
+Raw SMC reads remain in the control thread because its key-selection register
+cannot safely be shared with another reader. The web and logging threads never
+probe SMC or block cooling. See [hardware findings](MACPRO71-FINDINGS.md).
 
 ## Quick start: Mac Pro
 
@@ -68,21 +43,33 @@ and verify each fan’s source. NVIDIA card fan control is opt-in; the optional
 startup power cap defaults to disabled.
 
 Build with `--features web` to include the daemon’s telemetry store and web
-console. Use the platform guides above for the full hardware dashboard.
+console. Use the separate [Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)
+for the full application; the embedded console remains available for diagnostics.
 
 ```bash
 neofand --status  # Read the published snapshot without probing hardware
 ```
 
-## Documentation
+## Development and documentation
+
+```sh
+cargo test --locked
+cargo test --locked --all-features
+node --test web/chart-gaps.test.mjs
+```
 
 [Fan configuration and troubleshooting](docs/fan-control.md) ·
 [Mac Pro hardware findings](MACPRO71-FINDINGS.md) ·
-[Dashboard deployment](dashboard/README.md) ·
-[GPU library and builder](dashboard/assets/gpu-library/README.md)
+[Repository migration](docs/REPOSITORY-SPLIT.md) ·
+[Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)
+
+The daemon API and existing service/configuration paths are unchanged by the
+split. Existing users do not need to restart or reinstall the daemon.
 
 GPL-3.0-or-later. Forked from [T2FanRD](https://github.com/GnomedDev/T2FanRD).
 
 ## Security
 
-Read [SECURITY.md](SECURITY.md) before deploying. Dashboard containers require only read-only generated telemetry, not host devices or administrative sockets. New LXC templates are private by default. See the [November 2026 review](docs/security-review-2026-11.md) for fixes, verification and remaining boundaries.
+Read [SECURITY.md](SECURITY.md). Fan control requires host hardware access; keep
+the native API private. Control endpoints are disabled unless explicitly
+configured and authorized. The application cannot provide cooling failover.
