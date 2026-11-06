@@ -5,7 +5,7 @@ at source commit [98d1157f80cffacd59c8c86ae27a48350b322f12](https://github.com/a
 
 - [neofand](https://github.com/akhilv1/neofand): Mac Pro fan daemon, SMC/NVML
   integration, telemetry store, native API and small embedded diagnostic console.
-- [Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard): multiplatform application, collectors,
+- [ChassisDeck](https://github.com/akhilv1/hardware-dashboard): multiplatform application, collectors,
   integrations, GPU builder, Docker/Portainer and Proxmox LXC packaging.
 
 The new application repository retains the relevant Git history, author names

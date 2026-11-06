@@ -4,7 +4,7 @@ Per-component fan control and SMC telemetry for Mac Pro 7,1 running Linux.
 The daemon runs as a host systemd service, independently of Docker and the web UI.
 
 The multiplatform monitoring application has moved to
-**[Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)**.
+**[ChassisDeck](https://github.com/akhilv1/hardware-dashboard)**.
 That repository owns the full dashboard, GPU builder, Linux/P620 collectors,
 Proxmox and Docker integrations, and Docker/LXC packaging. It can monitor Linux
 and Proxmox without this daemon.
@@ -43,7 +43,7 @@ and verify each fan’s source. NVIDIA card fan control is opt-in; the optional
 startup power cap defaults to disabled.
 
 Build with `--features web` to include the daemon’s telemetry store and web
-console. Use the separate [Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)
+console. Use the separate [ChassisDeck](https://github.com/akhilv1/hardware-dashboard)
 for the full application; the embedded console remains available for diagnostics.
 
 ```bash
@@ -61,7 +61,7 @@ node --test web/chart-gaps.test.mjs
 [Fan configuration and troubleshooting](docs/fan-control.md) ·
 [Mac Pro hardware findings](MACPRO71-FINDINGS.md) ·
 [Repository migration](docs/REPOSITORY-SPLIT.md) ·
-[Hardware Dashboard](https://github.com/akhilv1/hardware-dashboard)
+[ChassisDeck](https://github.com/akhilv1/hardware-dashboard)
 
 The daemon API and existing service/configuration paths are unchanged by the
 split. Existing users do not need to restart or reinstall the daemon.

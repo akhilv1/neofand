@@ -1,4 +1,4 @@
-# Hardware Dashboard has moved
+# ChassisDeck has moved
 
 The multiplatform dashboard, GPU builder, Linux collectors, Proxmox/Docker
 integrations and container packaging now live in **[akhilv1/hardware-dashboard](https://github.com/akhilv1/hardware-dashboard)**.

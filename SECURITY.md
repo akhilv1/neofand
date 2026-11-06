@@ -20,7 +20,7 @@ X-Neofand-Control: 1, and enforce browser origin checks. Wildcard binding cannot
 enable controls. Tailnet membership alone does not authorize a control action.
 Request concurrency, sizes, deadlines and database work are bounded.
 
-The separate [Hardware Dashboard security model](https://github.com/akhilv1/hardware-dashboard/blob/master/SECURITY.md)
+The separate [ChassisDeck security model](https://github.com/akhilv1/hardware-dashboard/blob/master/SECURITY.md)
 covers containers, host collectors, persistence and ingress. Its GET-only proxy
 does not grant access to native write endpoints. Keep that boundary intact.
 
