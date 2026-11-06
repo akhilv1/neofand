@@ -311,6 +311,8 @@
 <script src="/hardware/assets/storage.js?v=20261105-guest-capacity"></script>
 <link rel="stylesheet" href="/hardware/assets/resource-dials.css?v=20261105-1">
 <script src="/hardware/assets/resource-dials.js?v=20261105-1" defer></script>
+<link rel="stylesheet" href="/hardware/assets/portainer.css?v=20261105-1">
+<script src="/hardware/assets/portainer.js?v=20261105-1" defer></script>
 </head>
 <body>
 
@@ -328,7 +330,7 @@
 
 <div class="shell">
   <nav class="rail" id="rail">
-    <div class="grp">Monitoring</div>
+    <div class="grp">Monitoring</div><a data-tab="portainer">Portainer</a>
     <a data-tab="overview" class="sel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
     <a data-tab="power"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Power zones</a>
     <a data-tab="thermal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13V5a2 2 0 1 1 4 0v8a4 4 0 1 1-4 0z"/></svg>Thermal</a>
@@ -364,7 +366,8 @@
       <span class="stamp" id="status"></span>
     </div>
 
-    <div id="tab-storage" hidden>
+    <div id="tab-portainer" class="grid" hidden><section class="card wide"><h2>Portainer</h2><div class="body"><div class="portainer-heading"><p id="portainer-status" class="portainer-status">Loading container inventory…</p><a id="portainer-open" href="/portainer/" target="_blank" rel="noopener noreferrer" hidden>Open Portainer ↗</a></div><p class="sub">Read-only Docker inventory for this host. Container management stays in Portainer.</p><div id="portainer-content"></div></div></section></div>
+<div id="tab-storage" hidden>
       <section class="card storage-intro"><h2>Storage</h2>
         <p class="storage-note">See what’s using each drive. Categories estimate Models, Photos, Backups and more from filenames and folders. Expand a category to see its largest contributors.</p>
         <div id="storage-summary"></div><div id="storage-status" class="storage-note">Loading storage…</div>
@@ -1451,6 +1454,14 @@ async function refresh() {
   if (state.refreshing) return;
   state.refreshing = true;
   try {
+    if (state.tab === "portainer") {
+      [state.metrics, state.latest] = await Promise.all([getJSON("/hardware/api/metrics"), getJSON("/hardware/api/latest")]);
+      renderSummary();
+      applyVisibility();
+      await window.neofandPortainerRefresh?.();
+      $("status").textContent = "Containers · latest snapshot";
+      return;
+    }
     if (state.tab === "storage") {
       await window.neofandStorageRefresh();
       $("status").textContent = "Storage · latest snapshot";
@@ -1544,6 +1555,7 @@ const CARD_REQS = {
 
 /* Cards with no chart, keyed by the element id of their content host. */
 const SECTION_REQS = {
+  'portainer-content': () => window.neofandPortainerAvailable !== false,
   summary:  () => state.metrics.length > 0,
   headroom: () => zones().length > 0,
   units:    () => !state.svc || state.svc.units.length > 0,
@@ -1580,7 +1592,7 @@ function applyVisibility() {
 }
 
 /* nav */
-const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot"];
+const TABS = ["overview", "power", "thermal", "sensors", "storage", "errors", "services", "boot", "portainer"];
 function selectTab(name) {
   state.tab = name;
   if(state.ranges[name])$("range").value=String(state.ranges[name]);

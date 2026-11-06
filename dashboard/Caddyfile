@@ -5,6 +5,15 @@
 :4791 {
     bind 127.0.0.1
 
+    @portainer {
+        path /api/portainer
+        method GET
+    }
+    handle @portainer {
+        rewrite * /portainer
+        reverse_proxy 127.0.0.1:4792
+    }
+
     @events {
         path /api/host-events
         method GET

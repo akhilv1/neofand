@@ -27,6 +27,14 @@ collectors are read-only; fan control belongs to the Mac Pro daemon.
 Live captures with identifying information cropped out. Chassis artwork and
 sensor positions are illustrative; see [capture notes](docs/screenshots/README.md).
 
+**Proxmox host, VM/LXC inventory, and resource overview**
+
+![Proxmox resource dials and anonymized guest tiles](docs/screenshots/proxmox-overview.jpg)
+
+Guest names and IDs are anonymized, and host/network identity is omitted. Resource readings and guest states are unchanged.
+
+Bare-metal Docker hosts also have a **Portainer** page with container state, health checks, Compose projects, CPU/RAM usage and a link to the management UI. The page reads a host-generated snapshot; the web container has no Docker socket or Portainer credentials. [Setup and access model](dashboard/PORTAINER.md).
+
 ## What’s included
 
 - **Sensors and history:** load bars, temperatures, fan speeds, board/system power

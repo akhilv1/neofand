@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 import uuid
 
-SNAPSHOTS=('linux.json','system-events.json','storage.json','proxmox.json','drive-health-history.json')
+SNAPSHOTS=('linux.json','system-events.json','storage.json','proxmox.json','drive-health-history.json','portainer.json')
 
 def export(source,destination,databases,host,mount_root=None):
     source=Path(source).resolve();destination=Path(destination).resolve()
